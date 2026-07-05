@@ -1,0 +1,27 @@
+{
+  "id": "com.atwright.drayton-wiser",
+  "version": "1.0.0",
+  "compatibility": ">=12.4.0",
+  "sdk": 3,
+  "runtime": "nodejs",
+  "platforms": [],
+  "name": {
+    "en": "Drayton Wiser"
+  },
+  "description": {
+    "en": "Adds support for Drayton Wiser devices."
+  },
+  "category": [
+    "climate"
+  ],
+  "permissions": [],
+  "images": {
+    "small": "/assets/images/small.png",
+    "large": "/assets/images/large.png",
+    "xlarge": "/assets/images/xlarge.png"
+  },
+  "author": {
+    "name": "Andy Wright",
+    "email": "atwright147@gmail.com"
+  }
+}
