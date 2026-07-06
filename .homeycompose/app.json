@@ -4,7 +4,8 @@
   "compatibility": ">=12.4.0",
   "sdk": 3,
   "runtime": "nodejs",
-  "platforms": [],
+  "platforms": ["local"],
+  "brandColor": "#E87722",
   "name": {
     "en": "Drayton Wiser"
   },
@@ -15,6 +16,7 @@
     "climate"
   ],
   "permissions": [],
+  "support": "mailto:atwright147@gmail.com",
   "images": {
     "small": "/assets/images/small.png",
     "large": "/assets/images/large.png",

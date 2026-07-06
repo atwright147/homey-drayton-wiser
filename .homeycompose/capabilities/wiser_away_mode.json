@@ -1,0 +1,16 @@
+{
+  "type": "boolean",
+  "title": {
+    "en": "Away Mode"
+  },
+  "getable": true,
+  "setable": true,
+  "uiComponent": "toggle",
+  "uiQuickAction": true,
+  "insightsTitleTrue": {
+    "en": "Away mode enabled"
+  },
+  "insightsTitleFalse": {
+    "en": "Away mode disabled"
+  }
+}

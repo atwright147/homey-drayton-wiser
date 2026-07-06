@@ -5,7 +5,10 @@
   "compatibility": ">=12.4.0",
   "sdk": 3,
   "runtime": "nodejs",
-  "platforms": [],
+  "platforms": [
+    "local"
+  ],
+  "brandColor": "#E87722",
   "name": {
     "en": "Drayton Wiser"
   },
@@ -16,6 +19,7 @@
     "climate"
   ],
   "permissions": [],
+  "support": "mailto:atwright147@gmail.com",
   "images": {
     "small": "/assets/images/small.png",
     "large": "/assets/images/large.png",
@@ -24,5 +28,152 @@
   "author": {
     "name": "Andy Wright",
     "email": "atwright147@gmail.com"
+  },
+  "drivers": [
+    {
+      "name": {
+        "en": "Wiser HeatHub"
+      },
+      "class": "other",
+      "capabilities": [
+        "wiser_away_mode",
+        "wiser_heating_active",
+        "wiser_cloud_connected",
+        "measure_signal"
+      ],
+      "platforms": [
+        "local"
+      ],
+      "connectivity": [
+        "lan"
+      ],
+      "images": {
+        "small": "/drivers/hub/assets/images/small.png",
+        "large": "/drivers/hub/assets/images/large.png",
+        "xlarge": "/drivers/hub/assets/images/xlarge.png"
+      },
+      "pair": [
+        {
+          "id": "start"
+        },
+        {
+          "id": "list_devices",
+          "template": "list_devices",
+          "navigation": {
+            "next": "add_devices"
+          }
+        },
+        {
+          "id": "add_devices",
+          "template": "add_devices"
+        }
+      ],
+      "settings": [
+        {
+          "id": "pollInterval",
+          "type": "number",
+          "label": {
+            "en": "Poll interval (seconds)"
+          },
+          "value": 30,
+          "min": 5,
+          "max": 3600
+        },
+        {
+          "id": "useHttps",
+          "type": "checkbox",
+          "label": {
+            "en": "Use HTTPS (self-signed)"
+          },
+          "value": false
+        }
+      ],
+      "id": "hub"
+    }
+  ],
+  "capabilities": {
+    "measure_signal": {
+      "type": "number",
+      "title": {
+        "en": "Signal Strength"
+      },
+      "getable": true,
+      "setable": false,
+      "units": {
+        "en": "%"
+      },
+      "min": 0,
+      "max": 100,
+      "step": 1,
+      "decimals": 0,
+      "uiComponent": "sensor"
+    },
+    "wiser_away_mode": {
+      "type": "boolean",
+      "title": {
+        "en": "Away Mode"
+      },
+      "getable": true,
+      "setable": true,
+      "uiComponent": "toggle",
+      "uiQuickAction": true,
+      "insightsTitleTrue": {
+        "en": "Away mode enabled"
+      },
+      "insightsTitleFalse": {
+        "en": "Away mode disabled"
+      }
+    },
+    "wiser_cloud_connected": {
+      "type": "boolean",
+      "title": {
+        "en": "Cloud Connected"
+      },
+      "getable": true,
+      "setable": false,
+      "uiComponent": null,
+      "insightsTitleTrue": {
+        "en": "Cloud connection restored"
+      },
+      "insightsTitleFalse": {
+        "en": "Cloud connection lost"
+      }
+    },
+    "wiser_heating_active": {
+      "type": "boolean",
+      "title": {
+        "en": "Heating Active"
+      },
+      "getable": true,
+      "setable": false,
+      "uiComponent": null,
+      "insightsTitleTrue": {
+        "en": "Heating turned on"
+      },
+      "insightsTitleFalse": {
+        "en": "Heating turned off"
+      }
+    }
+  },
+  "discovery": {
+    "wiser": {
+      "type": "mdns-sd",
+      "mdns-sd": {
+        "name": "http",
+        "protocol": "tcp"
+      },
+      "id": "{{name}}",
+      "conditions": [
+        [
+          {
+            "field": "name",
+            "match": {
+              "type": "regex",
+              "value": "WiserHeat.*"
+            }
+          }
+        ]
+      ]
+    }
   }
 }

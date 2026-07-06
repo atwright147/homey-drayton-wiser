@@ -2,6 +2,8 @@
   "extends": "@tsconfig/node16/tsconfig.json",
   "compilerOptions": {
     "allowJs": true,
-    "outDir": ".homeybuild/"
-  }
+    "outDir": ".homeybuild/",
+    "sourceMap": true
+  },
+  "exclude": ["test", "node_modules", ".homeybuild", "vitest.config.mts"]
 }

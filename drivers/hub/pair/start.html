@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html>
+<head>
+</head>
+<body>
+  <div class="homey-container">
+    <h1 class="homey-title" data-i18n="pair.start.title">Connect your Wiser HeatHub</h1>
+    <p data-i18n="pair.start.instructions">Enter the HeatHub IP address and secret key.</p>
+    <div class="homey-form-group">
+      <label class="homey-form-label" data-i18n="pair.start.ip">Hub IP address</label>
+      <input class="homey-form-input" type="text" id="ip" placeholder="192.168.0.95" />
+    </div>
+    <div class="homey-form-group">
+      <label class="homey-form-label" data-i18n="pair.start.secret">Secret key</label>
+      <input class="homey-form-input" type="password" id="secret" />
+    </div>
+    <button class="homey-button-primary" type="button" id="connect" data-i18n="pair.start.connect">Connect</button>
+    <p id="status"></p>
+  </div>
+
+  <script type="application/javascript">
+    (function() {
+      const connectButton = document.getElementById('connect');
+      const ipInput = document.getElementById('ip');
+      const secretInput = document.getElementById('secret');
+      const statusText = document.getElementById('status');
+
+      connectButton.addEventListener('click', function() {
+        const ip = ipInput.value.trim();
+        const secret = secretInput.value.trim();
+
+        if (!ip || !secret) {
+          statusText.textContent = Homey.__('pair.start.error.missing');
+          return;
+        }
+
+        connectButton.classList.add('is-loading');
+        connectButton.disabled = true;
+        statusText.textContent = '';
+
+        Homey.emit('login', { ip: ip, secret: secret }).then(function(result) {
+          connectButton.classList.remove('is-loading');
+          connectButton.disabled = false;
+          if (result) {
+            Homey.showView('list_devices');
+          } else {
+            statusText.textContent = Homey.__('pair.start.error.invalid');
+          }
+        }).catch(function(err) {
+          connectButton.classList.remove('is-loading');
+          connectButton.disabled = false;
+          statusText.textContent = Homey.__('pair.start.error.failed') + ' ' + err.message;
+        });
+      });
+    })();
+  </script>
+</body>
+</html>

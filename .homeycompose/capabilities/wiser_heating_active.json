@@ -1,0 +1,15 @@
+{
+  "type": "boolean",
+  "title": {
+    "en": "Heating Active"
+  },
+  "getable": true,
+  "setable": false,
+  "uiComponent": null,
+  "insightsTitleTrue": {
+    "en": "Heating turned on"
+  },
+  "insightsTitleFalse": {
+    "en": "Heating turned off"
+  }
+}

@@ -1,14 +1,13 @@
-'use strict';
-
 import Homey from 'homey';
+import WiserHubManager from './lib/wiser-hub-manager';
 
-module.exports = class MyApp extends Homey.App {
+class DraytonWiserApp extends Homey.App {
+  public hubManager!: WiserHubManager;
 
-  /**
-   * onInit is called when the app is initialized.
-   */
-  async onInit() {
-    this.log('MyApp has been initialized');
+  async onInit(): Promise<void> {
+    this.log('Drayton Wiser has been initialized');
+    this.hubManager = new WiserHubManager();
   }
-
 }
+
+module.exports = DraytonWiserApp;

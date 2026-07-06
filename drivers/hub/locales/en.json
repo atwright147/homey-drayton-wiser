@@ -1,0 +1,16 @@
+{
+  "pair": {
+    "start": {
+      "title": "Connect your Wiser HeatHub",
+      "instructions": "Enter the HeatHub IP address and secret key.",
+      "ip": "Hub IP address",
+      "secret": "Secret key",
+      "connect": "Connect",
+      "error": {
+        "missing": "Please enter both the IP address and secret key.",
+        "invalid": "Could not connect. Please check the IP address and secret key.",
+        "failed": "Connection failed:"
+      }
+    }
+  }
+}

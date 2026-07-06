@@ -1,0 +1,15 @@
+{
+  "type": "boolean",
+  "title": {
+    "en": "Cloud Connected"
+  },
+  "getable": true,
+  "setable": false,
+  "uiComponent": null,
+  "insightsTitleTrue": {
+    "en": "Cloud connection restored"
+  },
+  "insightsTitleFalse": {
+    "en": "Cloud connection lost"
+  }
+}
