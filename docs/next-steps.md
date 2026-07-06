@@ -33,19 +33,15 @@ Create a device for each hot water cylinder (`domain.HotWater[]`).
 
 Capabilities:
 
-- `onoff` or custom capability for hot water state
-- Custom capability for boost
-- `measure_temperature` if available
+- `wiser_hotwater_mode` (auto / on / off)
 
 Actions:
 
-- Boost hot water
 - Set mode
-- Cancel override
 
 ## Suggested Implementation Order
 
-1. HotWater driver (small, single data source)
+1. ✅ HotWater driver (small, single data source)
 2. iTRV driver
 3. RoomStat driver
 

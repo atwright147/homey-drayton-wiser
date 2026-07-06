@@ -15,10 +15,14 @@ drivers/hub/device.ts        lib/wiser-hub.ts
   registers WiserHub             poll loop + fan-out
   updates capabilities       lib/wiser-hub-manager.ts
 drivers/room/driver.ts       lib/wiser-types.ts
-  lists rooms from hubs      lib/wiser-utils.ts
+  lists rooms from hubs        lib/wiser-utils.ts
 drivers/room/device.ts       lib/wiser-errors.ts
   listens to hub poll
-  updates room capabilities
+drivers/hotwater/driver.ts   
+  lists hot water from hubs
+drivers/hotwater/device.ts
+  listens to hub poll
+  updates hot water capabilities
 ```
 
 ## Key Components
@@ -70,6 +74,7 @@ Custom capabilities defined in `.homeycompose/capabilities/`:
 - `wiser_cloud_connected` — sensor
 - `measure_signal` — sensor (percentage)
 - `wiser_room_mode` — enum (auto / manual / off)
+- `wiser_hotwater_mode` — enum (auto / on / off)
 
 ## Discovery
 
@@ -98,6 +103,23 @@ The Room driver uses the default system templates (`list_devices` / `add_devices
 2. For each Hub, it fetches the cached domain via `WiserHubManager`.
 3. Each room is returned as a candidate with a unique `data.id` and store values (`hubId`, `roomId`, `address`, `secret`, `useHttps`).
 4. The user selects the rooms to add in the standard `add_devices` view.
+
+### Hot Water Pairing
+
+The Hot Water driver uses the default system templates (`list_devices` / `add_devices`):
+
+1. `onPairListDevices` enumerates hot water cylinders from all paired Hub devices.
+2. For each Hub, it fetches the cached domain via `WiserHubManager`.
+3. Each hot water entity is returned as a candidate with a unique `data.id` and store values (`hubId`, `hotWaterId`, `address`, `secret`, `useHttps`).
+4. The user selects the hot water devices to add in the standard `add_devices` view.
+
+### HotWaterDevice
+
+- Registers as a listener on the parent Hub's `WiserHub` via `WiserHubManager`.
+- Falls back to creating its own `WiserClient`/`WiserHub` if the parent Hub is unavailable.
+- Device class: `other`.
+- Capability: `wiser_hotwater_mode`.
+- Writing `wiser_hotwater_mode` sends the mapped mode back to the hub.
 
 ## Important Decisions
 

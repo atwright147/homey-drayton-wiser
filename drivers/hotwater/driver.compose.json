@@ -1,0 +1,27 @@
+{
+  "name": {
+    "en": "Wiser Hot Water"
+  },
+  "class": "other",
+  "capabilities": [
+    "wiser_hotwater_mode"
+  ],
+  "platforms": ["local"],
+  "connectivity": ["lan"],
+  "images": {
+    "small": "/drivers/hotwater/assets/images/small.png",
+    "large": "/drivers/hotwater/assets/images/large.png",
+    "xlarge": "/drivers/hotwater/assets/images/xlarge.png"
+  },
+  "pair": [
+    {
+      "id": "list_devices",
+      "template": "list_devices",
+      "navigation": { "next": "add_devices" }
+    },
+    {
+      "id": "add_devices",
+      "template": "add_devices"
+    }
+  ]
+}
