@@ -58,6 +58,8 @@ homey app run --remote
 
 ## Pairing Test
 
+### HeatHub
+
 1. Run `homey app run --remote`.
 2. Open `https://my.homey.app` or the local URL `https://192-168-x-x.homey.homeylocal.com`.
 3. Add Device → Drayton Wiser → Wiser HeatHub.
@@ -66,6 +68,15 @@ homey app run --remote
 6. Enter the secret.
 7. Click Connect.
 8. Select the hub in the `list_devices` view and add it.
+
+### Room
+
+1. Pair the HeatHub first.
+2. Add Device → Drayton Wiser → Wiser Room.
+3. Select the rooms to add from the standard `list_devices` view.
+4. If the room has a wall-mounted RoomStat, the device will also report humidity.
+
+Note: Homey does not automatically add new capabilities to existing devices. If you add a capability to the Room driver after devices are paired, delete and re-pair the room device. Delete `.homeybuild` if the change is not reflected.
 
 ## Logs
 
@@ -87,6 +98,7 @@ When running `homey app run --remote`, logs stream to the terminal. Look for:
 | `onPair` never logged | Stale build or wrong pairing approach | Delete `.homeybuild`, use custom view |
 | `Could not load script: /js/homey.pair.js` | Custom view includes `/homey.js` | Remove the script tag |
 | `verifyConnection` fails | Wrong secret or short timeout | Double-check secret; use default client timeouts |
+| `Invalid Capability: ...` | Device was paired before the capability was added | Delete the device and re-pair; delete `.homeybuild` if needed |
 | Old code still running | `.homeybuild` stale | Delete `.homeybuild` and re-run |
 
 ## Code Style

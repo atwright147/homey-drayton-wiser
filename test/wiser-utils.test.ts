@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   toApiTemp,
   fromApiTemp,
+  validTemperatureFromApi,
   TEMP_ERROR,
   TEMP_OFF,
   batteryPercentFromVoltage,
@@ -99,6 +100,25 @@ describe('signalPercentFromDisplayed', () => {
     expect(signalPercentFromDisplayed('NoSignal')).toBe(0);
     expect(signalPercentFromDisplayed('Offline')).toBe(0);
     expect(signalPercentFromDisplayed('Unknown')).toBeNull();
+  });
+});
+
+describe('validTemperatureFromApi', () => {
+  it('converts API tenths to celsius', () => {
+    expect(validTemperatureFromApi(200)).toBe(20);
+    expect(validTemperatureFromApi(253)).toBe(25.3);
+  });
+
+  it('returns null for undefined', () => {
+    expect(validTemperatureFromApi(undefined)).toBeNull();
+  });
+
+  it('returns null for TEMP_ERROR', () => {
+    expect(validTemperatureFromApi(TEMP_ERROR)).toBeNull();
+  });
+
+  it('returns null for TEMP_OFF', () => {
+    expect(validTemperatureFromApi(TEMP_OFF)).toBeNull();
   });
 });
 

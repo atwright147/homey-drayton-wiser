@@ -15,6 +15,13 @@ export function fromApiTemp(apiTemp: number): number | null {
   return apiTemp / 10;
 }
 
+export function validTemperatureFromApi(apiTemp?: number): number | null {
+  if (apiTemp == null || apiTemp === TEMP_ERROR || apiTemp === TEMP_OFF) {
+    return null;
+  }
+  return apiTemp / 10;
+}
+
 export function clamp(value: number, min: number, max: number): number {
   if (value < min) return min;
   if (value > max) return max;

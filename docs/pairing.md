@@ -60,6 +60,8 @@ Homey will reject App Store submissions where users must enter an IP address if 
 
 ## Device Store and Settings
 
+### Hub
+
 After pairing, the device stores:
 
 - `store.address` — hub IP address
@@ -68,3 +70,15 @@ After pairing, the device stores:
 - `settings.useHttps` — whether to use HTTPS
 
 The `data.id` is the hub's `System.ChipId` (fallback to address).
+
+### Room
+
+After pairing, the room device stores:
+
+- `store.hubId` — parent Hub `data.id`
+- `store.roomId` — Wiser Room `id`
+- `store.address` — hub IP address (for fallback polling)
+- `store.secret` — hub secret (for fallback polling)
+- `store.useHttps` — whether to use HTTPS (for fallback polling)
+
+The `data.id` is `room-{hubId}-{roomId}`.

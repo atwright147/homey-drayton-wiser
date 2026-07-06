@@ -52,6 +52,8 @@ homey app run --remote   # REQUIRED for pairing tests
 - `lib/wiser-hub.ts` — poll loop and fan-out
 - `lib/wiser-hub-manager.ts` — singleton per app
 - `drivers/hub/device.ts` — hub device, registers with manager
+- `drivers/room/device.ts` — room device, listens to parent hub poll
+- `drivers/room/driver.ts` — room discovery from paired hubs
 - `lib/wiser-types.ts` — domain types
 - `lib/wiser-utils.ts` — helpers
 - `lib/wiser-errors.ts` — errors
@@ -59,7 +61,8 @@ homey app run --remote   # REQUIRED for pairing tests
 ## Drivers
 
 - `drivers/hub/` — HeatHub (complete, app-store-ready)
-- Planned: Room, iTRV, RoomStat, HotWater
+- `drivers/room/` — Room thermostat (complete: temperature, setpoint, humidity from RoomStat, mode)
+- Planned: iTRV, RoomStat, HotWater
 - Drivers are SDK v3; follow the `drivers/hub/` pattern.
 
 ## Important Gotchas

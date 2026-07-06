@@ -176,7 +176,7 @@ export class WiserClient {
   async setRoomSetpoint(id: number, celsius: number): Promise<void> {
     await this.request(`/data/v2/domain/Room/${id}`, {
       method: 'PATCH',
-      body: { Setpoint: toApiTemp(celsius), Mode: 'Manual' },
+      body: { RequestOverride: { Type: 'Manual', SetPoint: toApiTemp(celsius) } },
     });
   }
 

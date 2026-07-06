@@ -91,14 +91,16 @@ describe('WiserClient.verifyConnection', () => {
 });
 
 describe('WiserClient writes', () => {
-  it('setRoomSetpoint PATCHes Setpoint (×10) and Mode Manual', async () => {
+  it('setRoomSetpoint PATCHes a Manual override SetPoint (×10)', async () => {
     const { client, fetchFn } = makeClient();
     fetchFn.mockResolvedValue(fakeResponse({}));
     await client.setRoomSetpoint(1, 21.5);
     const [url, init] = lastCall(fetchFn);
     expect(url).toBe('http://192.168.0.95/data/v2/domain/Room/1');
     expect(init.method).toBe('PATCH');
-    expect(JSON.parse(init.body as string)).toEqual({ Setpoint: 215, Mode: 'Manual' });
+    expect(JSON.parse(init.body as string)).toEqual({
+      RequestOverride: { Type: 'Manual', SetPoint: 215 },
+    });
   });
 
   it('setRoomMode PATCHes the mapped mode', async () => {
