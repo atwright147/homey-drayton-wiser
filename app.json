@@ -36,7 +36,9 @@
       },
       "class": "other",
       "capabilities": [
-        "wiser_hotwater_mode"
+        "wiser_hotwater_state",
+        "wiser_hotwater_mode",
+        "wiser_hotwater_next_event"
       ],
       "platforms": [
         "local"
@@ -170,6 +172,29 @@
       "id": "room"
     }
   ],
+  "widgets": {
+    "wiser-schedule": {
+      "name": {
+        "en": "Wiser Hot Water Schedule"
+      },
+      "height": 240,
+      "devices": {
+        "type": "app",
+        "singular": true,
+        "filter": {
+          "capabilities": "wiser_hotwater_state"
+        }
+      },
+      "api": {
+        "getSchedule": {
+          "method": "GET",
+          "path": "/:deviceId"
+        }
+      },
+      "id": "wiser-schedule",
+      "settings": []
+    }
+  },
   "capabilities": {
     "measure_signal": {
       "type": "number",
@@ -261,6 +286,32 @@
           }
         }
       ]
+    },
+    "wiser_hotwater_next_event": {
+      "type": "string",
+      "title": {
+        "en": "Next Schedule Event"
+      },
+      "getable": true,
+      "setable": false,
+      "uiComponent": "sensor",
+      "icon": "/assets/clock.svg"
+    },
+    "wiser_hotwater_state": {
+      "type": "boolean",
+      "title": {
+        "en": "Heating"
+      },
+      "getable": true,
+      "setable": false,
+      "uiComponent": "sensor",
+      "icon": "/assets/flame.svg",
+      "insightsTitleTrue": {
+        "en": "Hot water started heating"
+      },
+      "insightsTitleFalse": {
+        "en": "Hot water stopped heating"
+      }
     },
     "wiser_room_mode": {
       "type": "enum",

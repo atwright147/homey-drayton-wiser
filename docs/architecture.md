@@ -118,8 +118,20 @@ The Hot Water driver uses the default system templates (`list_devices` / `add_de
 - Registers as a listener on the parent Hub's `WiserHub` via `WiserHubManager`.
 - Falls back to creating its own `WiserClient`/`WiserHub` if the parent Hub is unavailable.
 - Device class: `other`.
-- Capability: `wiser_hotwater_mode`.
+- Capabilities: `wiser_hotwater_state`, `wiser_hotwater_mode`, `wiser_hotwater_next_event`.
+- `wiser_hotwater_state` shows whether the hot water is currently heating (`WaterHeatingState` / `HotWaterRelayState`).
 - Writing `wiser_hotwater_mode` sends the mapped mode back to the hub.
+- `wiser_hotwater_next_event` shows the next scheduled On/Off change from the hot water's `ScheduleId`.
+
+## Widgets
+
+### `wiser-schedule`
+
+Dashboard widget that displays the full weekly hot water schedule and next event for a selected hot water device.
+- Settings: select a paired `hotwater` device.
+- API endpoint reads the schedule from the parent hub's cached domain.
+- UI renders each day with its On/Off time slots.
+- See `docs/widget.md` for implementation details and known gotchas.
 
 ## Important Decisions
 

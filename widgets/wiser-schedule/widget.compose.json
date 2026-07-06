@@ -1,0 +1,19 @@
+{
+  "name": {
+    "en": "Wiser Hot Water Schedule"
+  },
+  "height": 240,
+  "devices": {
+    "type": "app",
+    "singular": true,
+    "filter": {
+      "capabilities": "wiser_hotwater_state"
+    }
+  },
+  "api": {
+    "getSchedule": {
+      "method": "GET",
+      "path": "/:deviceId"
+    }
+  }
+}

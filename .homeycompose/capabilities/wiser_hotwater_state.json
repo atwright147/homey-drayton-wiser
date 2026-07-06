@@ -1,0 +1,16 @@
+{
+  "type": "boolean",
+  "title": {
+    "en": "Heating"
+  },
+  "getable": true,
+  "setable": false,
+  "uiComponent": "sensor",
+  "icon": "/assets/flame.svg",
+  "insightsTitleTrue": {
+    "en": "Hot water started heating"
+  },
+  "insightsTitleFalse": {
+    "en": "Hot water stopped heating"
+  }
+}

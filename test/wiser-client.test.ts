@@ -90,6 +90,30 @@ describe('WiserClient.verifyConnection', () => {
   });
 });
 
+describe('WiserClient.getSchedules', () => {
+  it('fetches /data/v2/schedules/ and flattens typed schedule objects', async () => {
+    const { client, fetchFn } = makeClient();
+    fetchFn.mockResolvedValue(fakeResponse({
+      json: async () => ({
+        HotWater: [{ id: 1000, Type: 'HotWater', Monday: [630, -2230] }],
+        Heating: [{ id: 1, Type: 'Heating', Monday: { Time: [390], DegreesC: [200] } }],
+      }),
+    }));
+    const schedules = await client.getSchedules();
+    expect(schedules).toHaveLength(2);
+    expect(schedules[0].id).toBe(1000);
+    expect(schedules[1].id).toBe(1);
+    const [url] = lastCall(fetchFn);
+    expect(url).toBe('http://192.168.0.95/data/v2/schedules/');
+  });
+
+  it('returns an empty array on 404', async () => {
+    const { client, fetchFn } = makeClient();
+    fetchFn.mockResolvedValue(fakeResponse({ status: 404, ok: false }));
+    expect(await client.getSchedules()).toEqual([]);
+  });
+});
+
 describe('WiserClient writes', () => {
   it('setRoomSetpoint PATCHes a Manual override SetPoint (×10)', async () => {
     const { client, fetchFn } = makeClient();

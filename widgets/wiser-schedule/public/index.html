@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    html, body {
+      height: 100%;
+      overflow: hidden;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      color: var(--homey-text-color, #000);
+      background: var(--homey-background-color, #fff);
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+    }
+    .header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 14px;
+      font-weight: 600;
+      margin-bottom: 4px;
+      opacity: 0.8;
+      flex-shrink: 0;
+    }
+    .homey-custom-icon-clock {
+      --homey-icon-size: var(--homey-icon-size-medium, 20px);
+      -webkit-mask-image: url('clock.svg');
+      mask-image: url('clock.svg');
+      background-color: var(--homey-icon-color, currentColor);
+      width: var(--homey-icon-size);
+      height: var(--homey-icon-size);
+      display: inline-block;
+      flex-shrink: 0;
+    }
+    .summary {
+      display: flex;
+      align-items: baseline;
+      gap: 8px;
+      margin-bottom: 8px;
+      flex-shrink: 0;
+    }
+    .state {
+      font-size: 18px;
+      font-weight: 600;
+      color: #e87722;
+    }
+    .state.off {
+      color: inherit;
+      opacity: 0.6;
+    }
+    .next {
+      font-size: 12px;
+      opacity: 0.8;
+    }
+    .schedule {
+      flex: 1 1 auto;
+      overflow-y: auto;
+      min-height: 0;
+      padding-right: 2px;
+    }
+    .day {
+      margin-bottom: 6px;
+    }
+    .day-name {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      opacity: 0.6;
+      margin-bottom: 2px;
+    }
+    .slots {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 3px;
+    }
+    .slot {
+      font-size: 11px;
+      padding: 2px 5px;
+      border-radius: 4px;
+      background: var(--homey-overlay-color, rgba(0, 0, 0, 0.05));
+    }
+    .slot.on {
+      color: #e87722;
+      font-weight: 500;
+    }
+    .slot.off {
+      opacity: 0.6;
+    }
+    .empty {
+      font-size: 12px;
+      opacity: 0.5;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div class="homey-custom-icon-clock"></div>
+    <span>Hot Water</span>
+  </div>
+  <div class="summary">
+    <span class="state" id="state">Loading...</span>
+    <span class="next" id="next">Loading...</span>
+  </div>
+  <div class="schedule" id="schedule"></div>
+
+  <script type="text/javascript">
+    function onHomeyReady(Homey) {
+      function getSelectedDeviceId() {
+        if (typeof Homey.getDeviceIds !== 'function') {
+          return null;
+        }
+        const deviceIds = Homey.getDeviceIds();
+        return deviceIds && deviceIds[0];
+      }
+
+      function renderState(state) {
+        const el = document.getElementById('state');
+        if (state === true) {
+          el.textContent = 'Heating';
+          el.className = 'state';
+        } else if (state === false) {
+          el.textContent = 'Off';
+          el.className = 'state off';
+        } else {
+          el.textContent = 'Unknown';
+          el.className = 'state off';
+        }
+      }
+
+      function renderNext(next) {
+        const el = document.getElementById('next');
+        el.textContent = next ? 'Next: ' + next : 'No next event';
+      }
+
+      function render(data) {
+        renderState(data.state);
+        renderNext(data.nextEvent);
+
+        const scheduleEl = document.getElementById('schedule');
+        scheduleEl.innerHTML = '';
+        if (data.schedule && data.schedule.length > 0) {
+          for (const day of data.schedule) {
+            const dayDiv = document.createElement('div');
+            dayDiv.className = 'day';
+
+            const nameDiv = document.createElement('div');
+            nameDiv.className = 'day-name';
+            nameDiv.textContent = day.day;
+            dayDiv.appendChild(nameDiv);
+
+            const slotsDiv = document.createElement('div');
+            slotsDiv.className = 'slots';
+            for (const slot of day.slots) {
+              const slotDiv = document.createElement('div');
+              slotDiv.className = 'slot ' + (slot.state === 'On' ? 'on' : 'off');
+              slotDiv.textContent = slot.time + ' ' + slot.state;
+              slotsDiv.appendChild(slotDiv);
+            }
+            dayDiv.appendChild(slotsDiv);
+            scheduleEl.appendChild(dayDiv);
+          }
+        } else {
+          scheduleEl.innerHTML = '<div class="empty">No schedule slots</div>';
+        }
+      }
+
+      function showNoDevice() {
+        document.getElementById('state').textContent = 'No device';
+        document.getElementById('state').className = 'state off';
+        document.getElementById('next').textContent = 'Select a device in widget settings';
+        document.getElementById('schedule').innerHTML = '';
+      }
+
+      function load() {
+        const deviceId = getSelectedDeviceId();
+        if (!deviceId) {
+          showNoDevice();
+          return;
+        }
+        Homey.api('GET', '/' + deviceId)
+          .then(render)
+          .catch(function (err) {
+            document.getElementById('state').textContent = 'Error';
+            document.getElementById('next').textContent = 'Could not load schedule';
+            console.error(err);
+          });
+      }
+
+      Homey.on('settings', load);
+      load();
+      setInterval(load, 60000);
+
+      Homey.ready({ height: 240 });
+    }
+  </script>
+</body>
+</html>

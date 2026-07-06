@@ -4,7 +4,9 @@
   },
   "class": "other",
   "capabilities": [
-    "wiser_hotwater_mode"
+    "wiser_hotwater_state",
+    "wiser_hotwater_mode",
+    "wiser_hotwater_next_event"
   ],
   "platforms": ["local"],
   "connectivity": ["lan"],

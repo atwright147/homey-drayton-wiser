@@ -2,11 +2,21 @@ import Homey from 'homey';
 import { WiserHub } from '../../lib/wiser-hub';
 import { WiserClient } from '../../lib/wiser-client';
 import WiserHubManager from '../../lib/wiser-hub-manager';
-import { hotWaterModeFromWiser, type HotWaterMode } from '../../lib/wiser-utils';
-import type { WiserDomain } from '../../lib/wiser-types';
+import { hotWaterModeFromWiser, formatNextHotWaterEvent, type HotWaterMode } from '../../lib/wiser-utils';
+import type { WiserDomain, WiserSchedule, WiserHotWater } from '../../lib/wiser-types';
 
 interface HubApp extends Homey.App {
   hubManager: WiserHubManager;
+}
+
+function hotWaterState(hotWater: WiserHotWater): boolean {
+  if (hotWater.WaterHeatingState != null) {
+    return hotWater.WaterHeatingState === 'On';
+  }
+  if (hotWater.HotWaterRelayState != null) {
+    return hotWater.HotWaterRelayState === 'On';
+  }
+  return false;
 }
 
 class HotWaterDevice extends Homey.Device {
@@ -23,8 +33,11 @@ class HotWaterDevice extends Homey.Device {
     if (this.hasCapability('onoff')) {
       await this.removeCapability('onoff');
     }
-    if (this.hasCapability('wiser_hotwater_state')) {
-      await this.removeCapability('wiser_hotwater_state');
+    if (!this.hasCapability('wiser_hotwater_state')) {
+      await this.addCapability('wiser_hotwater_state');
+    }
+    if (!this.hasCapability('wiser_hotwater_next_event')) {
+      await this.addCapability('wiser_hotwater_next_event');
     }
   }
 
@@ -84,8 +97,26 @@ class HotWaterDevice extends Homey.Device {
     }
 
     const mode = hotWaterModeFromWiser(hotWater.Mode ?? '') ?? 'auto';
+    const state = hotWaterState(hotWater);
+    const schedule = this.findHotWaterSchedule(domain, hotWater.ScheduleId);
+    const nextEvent = formatNextHotWaterEvent(schedule);
+
+    this.log('HotWater poll: scheduleId', hotWater.ScheduleId, 'schedule found', !!schedule, 'nextEvent', nextEvent);
+    if (!schedule) {
+      this.log('HotWater poll: domain.Schedule ids', domain.Schedule?.map((s) => s.id));
+    }
+
+    await this.setCapabilityValue('wiser_hotwater_state', state).catch(this.error);
     await this.setCapabilityValue('wiser_hotwater_mode', mode).catch(this.error);
+    await this.setCapabilityValue('wiser_hotwater_next_event', nextEvent ?? 'No schedule').catch(this.error);
     await this.setAvailable();
+  }
+
+  private findHotWaterSchedule(domain: WiserDomain, scheduleId?: number): WiserSchedule | undefined {
+    if (scheduleId == null) {
+      return undefined;
+    }
+    return domain.Schedule?.find((s) => s.id === scheduleId);
   }
 
   private async teardown(): Promise<void> {

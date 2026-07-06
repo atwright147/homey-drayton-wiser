@@ -1,0 +1,10 @@
+{
+  "type": "string",
+  "title": {
+    "en": "Next Schedule Event"
+  },
+  "getable": true,
+  "setable": false,
+  "uiComponent": "sensor",
+  "icon": "/assets/clock.svg"
+}

@@ -1,6 +1,7 @@
 import { fetch as undiciFetch, Agent } from 'undici';
 import type { Dispatcher, Response, RequestInit } from 'undici';
-import type { WiserDomain, WiserNetwork } from './wiser-types';
+import type { WiserDomain, WiserNetwork, WiserSchedule } from './wiser-types';
+import { flattenScheduleResponse } from './wiser-utils';
 import { WiserAuthError, WiserConnectionError, WiserRestError } from './wiser-errors';
 import {
   toApiTemp,
@@ -142,6 +143,17 @@ export class WiserClient {
   async getNetwork(): Promise<WiserNetwork> {
     const res = await this.request('/data/v2/network/');
     return (await res.json()) as WiserNetwork;
+  }
+
+  async getSchedules(): Promise<WiserSchedule[]> {
+    try {
+      const res = await this.request('/data/v2/schedules/');
+      const body = (await res.json()) as Record<string, unknown>;
+      return flattenScheduleResponse(body);
+    } catch (err) {
+      if (err instanceof WiserRestError && err.status === 404) return [];
+      throw err;
+    }
   }
 
   async getOpentherm(): Promise<unknown> {

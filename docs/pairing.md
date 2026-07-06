@@ -82,3 +82,15 @@ After pairing, the room device stores:
 - `store.useHttps` — whether to use HTTPS (for fallback polling)
 
 The `data.id` is `room-{hubId}-{roomId}`.
+
+### Hot Water
+
+After pairing, the hot water device stores:
+
+- `store.hubId` — parent Hub `data.id`
+- `store.hotWaterId` — Wiser HotWater `id`
+- `store.address` — hub IP address (for fallback polling)
+- `store.secret` — hub secret (for fallback polling)
+- `store.useHttps` — whether to use HTTPS (for fallback polling)
+
+The `data.id` is `hotwater-{hubId}-{hotWaterId}`.

@@ -54,6 +54,9 @@ homey app run --remote   # REQUIRED for pairing tests
 - `drivers/hub/device.ts` — hub device, registers with manager
 - `drivers/room/device.ts` — room device, listens to parent hub poll
 - `drivers/room/driver.ts` — room discovery from paired hubs
+- `drivers/hotwater/device.ts` — hot water device, listens to parent hub poll
+- `drivers/hotwater/driver.ts` — hot water discovery from paired hubs
+- `widgets/wiser-schedule/` — dashboard widget for hot water schedule
 - `lib/wiser-types.ts` — domain types
 - `lib/wiser-utils.ts` — helpers
 - `lib/wiser-errors.ts` — errors
@@ -62,7 +65,8 @@ homey app run --remote   # REQUIRED for pairing tests
 
 - `drivers/hub/` — HeatHub (complete, app-store-ready)
 - `drivers/room/` — Room thermostat (complete: temperature, setpoint, humidity from RoomStat, mode)
-- Planned: iTRV, RoomStat, HotWater
+- `drivers/hotwater/` — Hot water (complete: state, mode, next event, schedule widget)
+- Planned: iTRV, RoomStat
 - Drivers are SDK v3; follow the `drivers/hub/` pattern.
 
 ## Important Gotchas
@@ -73,12 +77,21 @@ homey app run --remote   # REQUIRED for pairing tests
 - Discovery results are accessed via `this.getDiscoveryStrategy().getDiscoveryResults()`.
 - Custom capabilities must be defined in `.homeycompose/capabilities/` and referenced by ID.
 
+## Widget Gotchas
+
+- Widget API paths should use path parameters (`/:deviceId`). `Homey.api('GET', '/', { deviceId })` does not send the object as query parameters.
+- `Homey.getDeviceIds()` returns Homey device IDs (UUIDs). Match widgets to devices using `device.getId()`, not `device.getData().id`.
+- The widget HTML must not include `<script src="/homey.js">`. The `Homey` global is injected by the runtime.
+- Use `Homey.ready({ height: 240 })` to request a widget height; design the UI to scroll if content exceeds the fixed height.
+
 ## Documentation
 
 See `docs/` for detailed documentation:
 - `docs/architecture.md`
 - `docs/pairing.md`
 - `docs/development.md`
+- `docs/hotwater.md`
+- `docs/widget.md`
 - `docs/next-steps.md`
 
 ## Common Checklist Before Saying Done

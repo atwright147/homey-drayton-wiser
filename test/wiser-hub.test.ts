@@ -8,6 +8,7 @@ import domainFixture from './fixtures/domain.json';
 function makeFakeClient(getDomain?: () => Promise<WiserDomain>) {
   return {
     getDomain: getDomain ?? vi.fn(async () => domainFixture as WiserDomain),
+    getSchedules: vi.fn(async () => []),
   };
 }
 

@@ -12,7 +12,7 @@
   "parserOptions": {
     "project": "./tsconfig.lint.json"
   },
-  "ignorePatterns": ["vitest.config.mts", ".homeybuild/", "node_modules/", "drivers/hub/pair/*.js"],
+  "ignorePatterns": ["vitest.config.mts", ".homeybuild/", "node_modules/", "drivers/hub/pair/*.js", "widgets/**/*.js"],
   "rules": {
     "import/extensions": ["error", "ignorePackages", {
       "js": "never", "jsx": "never", "ts": "never", "tsx": "never", "json": "always"

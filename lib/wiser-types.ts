@@ -186,10 +186,22 @@ export interface WiserDeviceCapabilityMatrix {
   LoadController?: boolean;
 }
 
+export interface WiserScheduleNext {
+  Day?: string;
+  Time?: number;
+  State?: string;
+  DegreesC?: number;
+}
+
 export interface WiserSchedule {
   id: number;
   Type?: string;
   Name?: string;
+  Description?: string;
+  Next?: WiserScheduleNext;
+  CurrentSetpoint?: number;
+  CurrentState?: string;
+  CurrentLevel?: number;
   Monday?: unknown;
   Tuesday?: unknown;
   Wednesday?: unknown;

@@ -15,7 +15,11 @@ import {
   roomModeFromWiser,
   hotWaterModeToWiser,
   hotWaterModeFromWiser,
+  nextHotWaterEvent,
+  formatNextHotWaterEvent,
+  formatScheduleTime,
 } from '../lib/wiser-utils';
+import type { WiserSchedule } from '../lib/wiser-types';
 
 describe('toApiTemp', () => {
   it('converts celsius to API tenths', () => {
@@ -147,5 +151,78 @@ describe('hotWaterMode mapping', () => {
     expect(hotWaterModeFromWiser('On')).toBe('on');
     expect(hotWaterModeFromWiser('Off')).toBe('off');
     expect(hotWaterModeFromWiser('Foo')).toBeNull();
+  });
+});
+
+describe('formatScheduleTime', () => {
+  it('formats HHMM values as HH:MM', () => {
+    expect(formatScheduleTime(630)).toBe('06:30');
+    expect(formatScheduleTime(0)).toBe('00:00');
+    expect(formatScheduleTime(2359)).toBe('23:59');
+  });
+});
+
+describe('nextHotWaterEvent', () => {
+  it('uses the schedule Next field when available', () => {
+    const schedule: WiserSchedule = {
+      id: 1000,
+      Type: 'HotWater',
+      Next: { Day: 'Monday', Time: 630, State: 'On' },
+    };
+    const now = new Date('2026-07-06T09:00:00'); // Monday 09:00
+    expect(nextHotWaterEvent(schedule, now)).toEqual({ day: 'Today', time: '06:30', state: 'On' });
+  });
+
+  it('uses Tomorrow for the Next field when the day is tomorrow', () => {
+    const schedule: WiserSchedule = {
+      id: 1000,
+      Type: 'HotWater',
+      Next: { Day: 'Tuesday', Time: 630, State: 'On' },
+    };
+    const now = new Date('2026-07-06T09:00:00'); // Monday 09:00
+    expect(nextHotWaterEvent(schedule, now)).toEqual({ day: 'Tomorrow', time: '06:30', state: 'On' });
+  });
+
+  it('returns the next slot after the reference time', () => {
+    const schedule: WiserSchedule = {
+      id: 1000,
+      Type: 'HotWater',
+      Monday: [630, -1030, 1630, -2230],
+      Tuesday: [700, -2030],
+    };
+    const now = new Date('2026-07-06T09:00:00'); // Monday 09:00
+    expect(nextHotWaterEvent(schedule, now)).toEqual({ day: 'Today', time: '10:30', state: 'Off' });
+  });
+
+  it('wraps to the next day when no slots remain today', () => {
+    const schedule: WiserSchedule = {
+      id: 1000,
+      Type: 'HotWater',
+      Monday: [630, -2230],
+      Tuesday: [700, -2030],
+    };
+    const now = new Date('2026-07-06T23:00:00'); // Monday 23:00
+    expect(nextHotWaterEvent(schedule, now)).toEqual({ day: 'Tomorrow', time: '07:00', state: 'On' });
+  });
+
+  it('returns null for an empty schedule', () => {
+    const schedule: WiserSchedule = { id: 1000, Type: 'HotWater' };
+    expect(nextHotWaterEvent(schedule)).toBeNull();
+  });
+});
+
+describe('formatNextHotWaterEvent', () => {
+  it('formats the next event as a readable string', () => {
+    const schedule: WiserSchedule = {
+      id: 1000,
+      Type: 'HotWater',
+      Next: { Day: 'Monday', Time: 630, State: 'On' },
+    };
+    const now = new Date('2026-07-08T09:00:00'); // Wednesday
+    expect(formatNextHotWaterEvent(schedule, now)).toBe('Monday 06:30 (On)');
+  });
+
+  it('returns null when no event exists', () => {
+    expect(formatNextHotWaterEvent(undefined)).toBeNull();
   });
 });

@@ -100,6 +100,9 @@ When running `homey app run --remote`, logs stream to the terminal. Look for:
 | `verifyConnection` fails | Wrong secret or short timeout | Double-check secret; use default client timeouts |
 | `Invalid Capability: ...` | Device was paired before the capability was added | Delete the device and re-pair; delete `.homeybuild` if needed |
 | Old code still running | `.homeybuild` stale | Delete `.homeybuild` and re-run |
+| Widget shows "Error loading schedule" | Widget API not receiving `deviceId` | Use a path parameter (`/:deviceId`) instead of query/body parameters |
+| Widget shows "Device not found" | Looking up by pairing `data.id` instead of Homey ID | Use `device.getId()` in the widget API handler |
+| Widget only shows 3 days | Fixed widget height clips content | Make the schedule area scrollable or reduce slot sizes |
 
 ## Code Style
 

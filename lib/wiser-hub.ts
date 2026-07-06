@@ -78,7 +78,13 @@ export class WiserHub {
     }
     this.polling = true;
     try {
-      const domain = await this.client.getDomain();
+      const [domain, schedules] = await Promise.all([
+        this.client.getDomain(),
+        this.client.getSchedules().catch(() => []),
+      ]);
+      if (schedules.length > 0) {
+        domain.Schedule = schedules;
+      }
       this.latestDomain = domain;
       for (const listener of this.listeners.values()) {
         await Promise.resolve(listener(domain));
