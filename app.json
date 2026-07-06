@@ -47,6 +47,7 @@
       "connectivity": [
         "lan"
       ],
+      "discovery": "wiser",
       "images": {
         "small": "/drivers/hub/assets/images/small.png",
         "large": "/drivers/hub/assets/images/large.png",

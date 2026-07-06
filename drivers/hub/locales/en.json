@@ -2,7 +2,8 @@
   "pair": {
     "start": {
       "title": "Connect your Wiser HeatHub",
-      "instructions": "Enter the HeatHub IP address and secret key.",
+      "instructions": "Select a discovered hub, or enter its IP address and secret key.",
+      "select": "Discovered hubs",
       "ip": "Hub IP address",
       "secret": "Secret key",
       "connect": "Connect",

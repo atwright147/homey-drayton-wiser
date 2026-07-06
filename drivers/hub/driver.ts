@@ -1,6 +1,12 @@
 import Homey from 'homey';
 import { WiserClient } from '../../lib/wiser-client';
 
+interface DiscoveredHub {
+  id: string;
+  name: string;
+  address: string;
+}
+
 interface HubDevice {
   name: string;
   data: { id: string };
@@ -18,6 +24,18 @@ class HubDriver extends Homey.Driver {
     let address = '';
     let secret = '';
 
+    session.setHandler('discover', async (): Promise<DiscoveredHub[]> => {
+      this.log('discover handler called');
+      const strategy = this.getDiscoveryStrategy();
+      const results = strategy.getDiscoveryResults() as Record<string, Homey.DiscoveryResultMDNSSD>;
+      this.log('discovery results:', Object.keys(results));
+      return Object.values(results).map((result) => ({
+        id: result.id,
+        name: result.name,
+        address: result.address,
+      }));
+    });
+
     session.setHandler('login', async (data: { ip: string; secret: string }): Promise<boolean> => {
       this.log('Login handler called with ip:', data.ip);
       address = data.ip.trim();
@@ -31,15 +49,16 @@ class HubDriver extends Homey.Driver {
       const client = new WiserClient({
         host: address,
         secret,
-        retries: 1,
-        retryDelayMs: 0,
-        timeoutMs: 4000,
       });
 
       this.log('Verifying connection to', address);
-      const ok = await client.verifyConnection();
-      this.log('Verify result:', ok);
-      return ok;
+      const domain = await client.verifyConnectionWithDomain();
+      if (domain === null) {
+        this.log('Verify failed: could not fetch domain or unexpected BrandName');
+        throw new Error('Could not connect to the Wiser hub. Check the IP address and secret.');
+      }
+      this.log('Verify success');
+      return true;
     });
 
     session.setHandler('list_devices', async (): Promise<HubDevice[]> => {
@@ -47,9 +66,6 @@ class HubDriver extends Homey.Driver {
       const client = new WiserClient({
         host: address,
         secret,
-        retries: 1,
-        retryDelayMs: 0,
-        timeoutMs: 4000,
       });
       const domain = await client.getDomain();
       const id = domain.System?.ChipId ?? address;

@@ -5,25 +5,66 @@
 <body>
   <div class="homey-container">
     <h1 class="homey-title" data-i18n="pair.start.title">Connect your Wiser HeatHub</h1>
-    <p data-i18n="pair.start.instructions">Enter the HeatHub IP address and secret key.</p>
+    <p data-i18n="pair.start.instructions">Select a discovered hub, or enter its IP address and secret key.</p>
+
+    <div class="homey-form-group">
+      <label class="homey-form-label" data-i18n="pair.start.select">Discovered hubs</label>
+      <select class="homey-form-input" id="hub-select">
+        <option value="">Select a hub...</option>
+      </select>
+    </div>
+
     <div class="homey-form-group">
       <label class="homey-form-label" data-i18n="pair.start.ip">Hub IP address</label>
       <input class="homey-form-input" type="text" id="ip" placeholder="192.168.0.95" />
     </div>
+
     <div class="homey-form-group">
       <label class="homey-form-label" data-i18n="pair.start.secret">Secret key</label>
       <input class="homey-form-input" type="password" id="secret" />
     </div>
+
     <button class="homey-button-primary" type="button" id="connect" data-i18n="pair.start.connect">Connect</button>
     <p id="status"></p>
   </div>
 
   <script type="application/javascript">
     (function() {
+      const hubSelect = document.getElementById('hub-select');
       const connectButton = document.getElementById('connect');
       const ipInput = document.getElementById('ip');
       const secretInput = document.getElementById('secret');
       const statusText = document.getElementById('status');
+
+      function loadDiscoveredHubs() {
+        Homey.emit('discover').then(function(hubs) {
+          hubSelect.innerHTML = '<option value="">Select a hub...</option>';
+          if (!hubs || hubs.length === 0) {
+            const option = document.createElement('option');
+            option.value = '';
+            option.textContent = 'No hubs discovered (enter IP manually)';
+            option.disabled = true;
+            hubSelect.appendChild(option);
+            return;
+          }
+          hubs.forEach(function(hub) {
+            const option = document.createElement('option');
+            option.value = hub.address;
+            option.textContent = hub.name + ' (' + hub.address + ')';
+            option.dataset.id = hub.id;
+            hubSelect.appendChild(option);
+          });
+        }).catch(function(err) {
+          statusText.textContent = 'Discovery failed: ' + err.message;
+        });
+      }
+
+      hubSelect.addEventListener('change', function() {
+        const address = hubSelect.value;
+        if (address) {
+          ipInput.value = address;
+        }
+      });
 
       connectButton.addEventListener('click', function() {
         const ip = ipInput.value.trim();
@@ -52,6 +93,8 @@
           statusText.textContent = Homey.__('pair.start.error.failed') + ' ' + err.message;
         });
       });
+
+      loadDiscoveredHubs();
     })();
   </script>
 </body>
