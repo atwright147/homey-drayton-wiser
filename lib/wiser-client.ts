@@ -5,6 +5,8 @@ import { flattenScheduleResponse } from './wiser-utils';
 import { WiserAuthError, WiserConnectionError, WiserRestError } from './wiser-errors';
 import {
   toApiTemp,
+  toApiBoostDelta,
+  HW_TEMP_ON,
   roomModeToWiser,
   hotWaterModeToWiser,
   type RoomMode,
@@ -200,13 +202,16 @@ export class WiserClient {
   }
 
   async boostRoom(id: number, deltaCelsius: number, minutes: number): Promise<void> {
-    const domain = await this.getDomain();
-    const room = domain.Room?.find((r) => r.id === id);
-    const currentSetPoint = room?.CurrentSetPoint ?? room?.ScheduledSetPoint ?? 200;
-    const targetApiTemp = toApiTemp((currentSetPoint / 10) + deltaCelsius);
     await this.request(`/data/v2/domain/Room/${id}`, {
       method: 'PATCH',
-      body: { RequestOverride: { Type: 'Boost', SetPoint: targetApiTemp, DurationMinutes: minutes } },
+      body: { RequestOverride: { Type: 'Boost', IncreaseSetPointBy: toApiBoostDelta(deltaCelsius), DurationMinutes: minutes } },
+    });
+  }
+
+  async setRoomSetpointForDuration(id: number, celsius: number, minutes: number): Promise<void> {
+    await this.request(`/data/v2/domain/Room/${id}`, {
+      method: 'PATCH',
+      body: { RequestOverride: { Type: 'Manual', SetPoint: toApiTemp(celsius), DurationMinutes: minutes } },
     });
   }
 
@@ -242,7 +247,7 @@ export class WiserClient {
   async setHotWaterOverride(id: number, minutes: number): Promise<void> {
     await this.request(`/data/v2/domain/HotWater/${id}`, {
       method: 'PATCH',
-      body: { RequestOverride: { Type: 'Boost', DurationMinutes: minutes } },
+      body: { RequestOverride: { Type: 'Manual', SetPoint: HW_TEMP_ON, DurationMinutes: minutes } },
     });
   }
 

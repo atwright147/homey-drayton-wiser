@@ -1,0 +1,25 @@
+{
+  "actions": [
+    {
+      "id": "boost_hot_water",
+      "title": {
+        "en": "Boost hot water"
+      },
+      "titleFormatted": {
+        "en": "Boost hot water for [[duration]] minutes"
+      },
+      "args": [
+        {
+          "type": "number",
+          "name": "duration",
+          "title": {
+            "en": "Duration"
+          },
+          "min": 1,
+          "max": 1440,
+          "value": 60
+        }
+      ]
+    }
+  ]
+}

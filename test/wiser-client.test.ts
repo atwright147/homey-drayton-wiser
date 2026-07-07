@@ -136,17 +136,27 @@ describe('WiserClient writes', () => {
     expect(JSON.parse(init.body as string)).toEqual({ Mode: 'Auto' });
   });
 
-  it('boostRoom reads current setpoint then PATCHes a Boost override', async () => {
+  it('boostRoom PATCHes a Boost override with IncreaseSetPointBy', async () => {
     const { client, fetchFn } = makeClient();
-    fetchFn.mockResolvedValueOnce(fakeResponse({ json: async () => domainFixture }));
-    fetchFn.mockResolvedValueOnce(fakeResponse({}));
-    await client.boostRoom(1, 2, 60);
-    expect(fetchFn).toHaveBeenCalledTimes(2);
-    const [patchUrl, patchInit] = lastCall(fetchFn, 1);
-    expect(patchUrl).toBe('http://192.168.0.95/data/v2/domain/Room/1');
-    expect(patchInit.method).toBe('PATCH');
-    expect(JSON.parse(patchInit.body as string)).toEqual({
-      RequestOverride: { Type: 'Boost', SetPoint: 220, DurationMinutes: 60 },
+    fetchFn.mockResolvedValue(fakeResponse({}));
+    await client.boostRoom(1, 2.5, 60);
+    const [url, init] = lastCall(fetchFn);
+    expect(url).toBe('http://192.168.0.95/data/v2/domain/Room/1');
+    expect(init.method).toBe('PATCH');
+    expect(JSON.parse(init.body as string)).toEqual({
+      RequestOverride: { Type: 'Boost', IncreaseSetPointBy: 25, DurationMinutes: 60 },
+    });
+  });
+
+  it('setRoomSetpointForDuration PATCHes a Manual override with SetPoint and DurationMinutes', async () => {
+    const { client, fetchFn } = makeClient();
+    fetchFn.mockResolvedValue(fakeResponse({}));
+    await client.setRoomSetpointForDuration(1, 23.5, 45);
+    const [url, init] = lastCall(fetchFn);
+    expect(url).toBe('http://192.168.0.95/data/v2/domain/Room/1');
+    expect(init.method).toBe('PATCH');
+    expect(JSON.parse(init.body as string)).toEqual({
+      RequestOverride: { Type: 'Manual', SetPoint: 235, DurationMinutes: 45 },
     });
   });
 
@@ -176,13 +186,13 @@ describe('WiserClient writes', () => {
     expect(JSON.parse(init.body as string)).toEqual({ Mode: 'On' });
   });
 
-  it('setHotWaterOverride PATCHes a Boost override', async () => {
+  it('setHotWaterOverride PATCHes a Manual override with SetPoint 1100', async () => {
     const { client, fetchFn } = makeClient();
     fetchFn.mockResolvedValue(fakeResponse({}));
     await client.setHotWaterOverride(2, 30);
     const [, init] = lastCall(fetchFn);
     expect(JSON.parse(init.body as string)).toEqual({
-      RequestOverride: { Type: 'Boost', DurationMinutes: 30 },
+      RequestOverride: { Type: 'Manual', SetPoint: 1100, DurationMinutes: 30 },
     });
   });
 });

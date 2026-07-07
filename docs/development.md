@@ -104,10 +104,58 @@ When running `homey app run --remote`, logs stream to the terminal. Look for:
 | Widget shows "Device not found" | Looking up by pairing `data.id` instead of Homey ID | Use `device.getId()` in the widget API handler |
 | Widget only shows 3 days | Fixed widget height clips content | Make the schedule area scrollable or reduce slot sizes |
 
+## Testing Flow Cards
+
+Flow cards are exercised in `test/drivers/flow-actions.test.ts`. The Homey SDK is mocked, so the tests verify that the driver registers the correct action card and calls the expected `WiserClient` method with the right arguments.
+
+### Automated tests
+
+```bash
+npm test
+```
+
+This runs unit tests for `lib/` and the driver Flow-card registration.
+
+### Manual Flow tests
+
+1. Build and run remotely:
+   ```bash
+   rm -rf .homeybuild
+   homey app build
+   homey app run --remote
+   ```
+2. In the Homey web/mobile app, create a new Flow.
+3. Add a trigger and then add the action cards under **Drayton Wiser**.
+4. Save and run the Flow.
+
+#### Boost heating
+
+- Flow action: **Boost heating**
+- Arguments: target temperature (5–30 °C), duration (minutes)
+- Sends to the hub:
+  ```json
+  { "RequestOverride": { "Type": "Manual", "SetPoint": <target × 10>, "DurationMinutes": <duration> } }
+  ```
+
+#### Boost hot water
+
+- Flow action: **Boost hot water**
+- Arguments: duration (minutes)
+- Sends to the hub:
+  ```json
+  { "RequestOverride": { "Type": "Manual", "SetPoint": 1100, "DurationMinutes": <duration> } }
+  ```
+
+### Important notes
+
+- Always use `homey app run --remote` for Flow-card tests. Docker mode does not always register the cards correctly.
+- Delete `.homeybuild` if the running app does not reflect recent code changes.
+- If an existing Flow was created before an action card argument changed, re-create the action step in the Flow so it uses the new argument schema.
+
 ## Code Style
 
 - TypeScript with strict compiler settings.
 - ESLint with `athom/homey-app` config.
-- No comments in code (per project convention).
+- No comments in source code (per project convention).
 - Use `module.exports = class` for Homey-loaded entry files (`app.ts`, `driver.ts`, `device.ts`).
 - SDK-free code lives in `lib/` and is unit-tested with Vitest.

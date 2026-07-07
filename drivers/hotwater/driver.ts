@@ -21,6 +21,20 @@ interface HotWaterPairDevice {
 }
 
 class HotWaterDriver extends Homey.Driver {
+  async onInit(): Promise<void> {
+    this.homey.flow.getActionCard('boost_hot_water').registerRunListener(async (args: { device: Homey.Device; duration: number }) => {
+      const hotWaterId = args.device.getStoreValue('hotWaterId') as number;
+      const hubId = args.device.getStoreValue('hubId') as string;
+      const manager = (this.homey.app as HubApp).hubManager;
+      const hub = manager.get(hubId);
+      if (!hub) {
+        throw new Error('Hub not available');
+      }
+      await hub.getClient().setHotWaterOverride(hotWaterId, args.duration);
+      await hub.poll();
+    });
+  }
+
   async onPairListDevices(): Promise<HotWaterPairDevice[]> {
     const hubDriver = this.homey.drivers.getDriver('hub');
     const hubDevices = hubDriver.getDevices();

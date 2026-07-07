@@ -4,12 +4,19 @@ export const TEMP_ERROR = 2000;
 export const TEMP_OFF = -200;
 export const TEMP_MINIMUM = 5;
 export const TEMP_MAXIMUM = 30;
+export const HW_TEMP_ON = 1100;
+export const HW_TEMP_OFF = -200;
+export const MAX_BOOST_DELTA = 5;
 
 export type RoomMode = 'auto' | 'manual' | 'off';
 export type HotWaterMode = 'auto' | 'on' | 'off';
 
 export function toApiTemp(celsius: number): number {
   return Math.round(celsius * 10);
+}
+
+export function toApiBoostDelta(celsius: number): number {
+  return Math.max(0, Math.min(MAX_BOOST_DELTA, celsius)) * 10;
 }
 
 export function fromApiTemp(apiTemp: number): number | null {

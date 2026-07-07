@@ -6,8 +6,9 @@ This folder contains documentation for developers/agents working on the Homey Pr
 
 - [Architecture](./architecture.md) — overall structure and design decisions
 - [Pairing](./pairing.md) — how HeatHub pairing works, including mDNS discovery
-- [Development](./development.md) — how to run, test, and debug the app
+- [Development](./development.md) — how to run, test, and debug the app, including Flow cards
 - [Next Steps](./next-steps.md) — planned drivers and features
+- [TODO](./todo.md) — missing features compared to the Home Assistant Wiser integration
 
 ## Project Context
 

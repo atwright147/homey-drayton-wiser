@@ -18,6 +18,21 @@ interface RoomPairDevice {
 }
 
 class RoomDriver extends Homey.Driver {
+  async onInit(): Promise<void> {
+    this.homey.flow.getActionCard('boost_room').registerRunListener(async (args: { device: Homey.Device; temperature: number; duration: number }) => {
+      const roomId = args.device.getStoreValue('roomId') as number;
+      const hubId = args.device.getStoreValue('hubId') as string;
+      const manager = (this.homey.app as HubApp).hubManager;
+      const hub = manager.get(hubId);
+      if (!hub) {
+        throw new Error('Hub not available');
+      }
+      this.log('Boost room', roomId, 'target', args.temperature, 'duration', args.duration);
+      await hub.getClient().setRoomSetpointForDuration(roomId, args.temperature, args.duration);
+      await hub.poll();
+    });
+  }
+
   async onPairListDevices(): Promise<RoomPairDevice[]> {
     const hubDriver = this.homey.drivers.getDriver('hub');
     const hubDevices = hubDriver.getDevices();
