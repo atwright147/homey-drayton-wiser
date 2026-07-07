@@ -229,6 +229,20 @@ export class WiserClient {
     });
   }
 
+  async setComfortMode(enabled: boolean): Promise<void> {
+    await this.request('/data/v2/domain/System', {
+      method: 'PATCH',
+      body: { ComfortModeEnabled: enabled },
+    });
+  }
+
+  async setEcoMode(enabled: boolean): Promise<void> {
+    await this.request('/data/v2/domain/System', {
+      method: 'PATCH',
+      body: { EcoModeEnabled: enabled },
+    });
+  }
+
   async boostAllRooms(deltaCelsius: number, minutes: number): Promise<void> {
     const domain = await this.getDomain();
     const rooms = domain.Room ?? [];

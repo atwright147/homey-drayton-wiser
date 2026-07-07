@@ -136,6 +136,24 @@ describe('WiserClient writes', () => {
     expect(JSON.parse(init.body as string)).toEqual({ Mode: 'Auto' });
   });
 
+  it('setRoomMode PATCHes Manual mode', async () => {
+    const { client, fetchFn } = makeClient();
+    fetchFn.mockResolvedValue(fakeResponse({}));
+    await client.setRoomMode(1, 'manual');
+    const [url, init] = lastCall(fetchFn);
+    expect(url).toBe('http://192.168.0.95/data/v2/domain/Room/1');
+    expect(JSON.parse(init.body as string)).toEqual({ Mode: 'Manual' });
+  });
+
+  it('setRoomMode PATCHes Off mode', async () => {
+    const { client, fetchFn } = makeClient();
+    fetchFn.mockResolvedValue(fakeResponse({}));
+    await client.setRoomMode(1, 'off');
+    const [url, init] = lastCall(fetchFn);
+    expect(url).toBe('http://192.168.0.95/data/v2/domain/Room/1');
+    expect(JSON.parse(init.body as string)).toEqual({ Mode: 'Off' });
+  });
+
   it('boostRoom PATCHes a Boost override with IncreaseSetPointBy', async () => {
     const { client, fetchFn } = makeClient();
     fetchFn.mockResolvedValue(fakeResponse({}));
@@ -175,6 +193,24 @@ describe('WiserClient writes', () => {
     const [url, init] = lastCall(fetchFn);
     expect(url).toBe('http://192.168.0.95/data/v2/domain/System');
     expect(JSON.parse(init.body as string)).toEqual({ AwayMode: true });
+  });
+
+  it('setComfortMode PATCHes System', async () => {
+    const { client, fetchFn } = makeClient();
+    fetchFn.mockResolvedValue(fakeResponse({}));
+    await client.setComfortMode(true);
+    const [url, init] = lastCall(fetchFn);
+    expect(url).toBe('http://192.168.0.95/data/v2/domain/System');
+    expect(JSON.parse(init.body as string)).toEqual({ ComfortModeEnabled: true });
+  });
+
+  it('setEcoMode PATCHes System', async () => {
+    const { client, fetchFn } = makeClient();
+    fetchFn.mockResolvedValue(fakeResponse({}));
+    await client.setEcoMode(true);
+    const [url, init] = lastCall(fetchFn);
+    expect(url).toBe('http://192.168.0.95/data/v2/domain/System');
+    expect(JSON.parse(init.body as string)).toEqual({ EcoModeEnabled: true });
   });
 
   it('setHotWaterMode PATCHes the mapped hot water mode', async () => {

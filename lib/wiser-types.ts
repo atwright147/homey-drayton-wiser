@@ -33,6 +33,7 @@ export interface WiserSystem {
   CoolingModeDefaultSetpoint?: number;
   CoolingAwayModeSetpointLimit?: number;
   ComfortModeEnabled?: boolean;
+  EcoModeEnabled?: boolean;
   PreheatTimeLimit?: number;
   DegradedModeSetpointThreshold?: number;
   GeoPosition?: WiserGeoPosition;

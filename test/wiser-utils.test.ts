@@ -11,6 +11,9 @@ import {
   batteryPercentFromLevel,
   signalPercentFromRssi,
   signalPercentFromDisplayed,
+  booleanFromWiser,
+  binaryModeFromBoolean,
+  binaryModeToBoolean,
   roomModeToWiser,
   roomModeFromWiser,
   hotWaterModeToWiser,
@@ -104,6 +107,41 @@ describe('signalPercentFromDisplayed', () => {
     expect(signalPercentFromDisplayed('NoSignal')).toBe(0);
     expect(signalPercentFromDisplayed('Offline')).toBe(0);
     expect(signalPercentFromDisplayed('Unknown')).toBeNull();
+  });
+});
+
+describe('booleanFromWiser', () => {
+  it('parses booleans, numbers, and common string values', () => {
+    expect(booleanFromWiser(true)).toBe(true);
+    expect(booleanFromWiser(false)).toBe(false);
+    expect(booleanFromWiser(1)).toBe(true);
+    expect(booleanFromWiser(0)).toBe(false);
+    expect(booleanFromWiser('true')).toBe(true);
+    expect(booleanFromWiser('True')).toBe(true);
+    expect(booleanFromWiser('false')).toBe(false);
+    expect(booleanFromWiser('False')).toBe(false);
+    expect(booleanFromWiser('on')).toBe(true);
+    expect(booleanFromWiser('off')).toBe(false);
+  });
+
+  it('defaults unknown values to false', () => {
+    expect(booleanFromWiser('auto')).toBe(false);
+    expect(booleanFromWiser(undefined)).toBe(false);
+    expect(booleanFromWiser(null)).toBe(false);
+    expect(booleanFromWiser({})).toBe(false);
+  });
+});
+
+describe('binary mode mapping', () => {
+  it('maps booleans to enum values', () => {
+    expect(binaryModeFromBoolean(true)).toBe('on');
+    expect(binaryModeFromBoolean(false)).toBe('off');
+  });
+
+  it('maps enum values to booleans', () => {
+    expect(binaryModeToBoolean('on')).toBe(true);
+    expect(binaryModeToBoolean('off')).toBe(false);
+    expect(binaryModeToBoolean('invalid')).toBe(false);
   });
 });
 

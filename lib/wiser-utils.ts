@@ -10,6 +10,7 @@ export const MAX_BOOST_DELTA = 5;
 
 export type RoomMode = 'auto' | 'manual' | 'off';
 export type HotWaterMode = 'auto' | 'on' | 'off';
+export type BinaryMode = 'on' | 'off';
 
 export function toApiTemp(celsius: number): number {
   return Math.round(celsius * 10);
@@ -77,6 +78,29 @@ export function signalPercentFromDisplayed(strength: string): number | null {
     case 'Offline': return 0;
     default: return null;
   }
+}
+
+export function booleanFromWiser(value: unknown): boolean {
+  if (typeof value === 'boolean') return value;
+  if (typeof value === 'number') return value === 1;
+  if (typeof value === 'string') {
+    const normalized = value.trim().toLowerCase();
+    if (normalized === 'true' || normalized === '1' || normalized === 'on' || normalized === 'yes') {
+      return true;
+    }
+    if (normalized === 'false' || normalized === '0' || normalized === 'off' || normalized === 'no') {
+      return false;
+    }
+  }
+  return false;
+}
+
+export function binaryModeFromBoolean(value: boolean): BinaryMode {
+  return value ? 'on' : 'off';
+}
+
+export function binaryModeToBoolean(value: string): boolean {
+  return value === 'on';
 }
 
 export function roomModeToWiser(mode: RoomMode): string {

@@ -10,6 +10,30 @@
   ],
   "platforms": ["local"],
   "connectivity": ["lan"],
+  "settings": [
+    {
+      "id": "hotWaterMode",
+      "type": "dropdown",
+      "label": {
+        "en": "Hot Water Mode"
+      },
+      "value": "auto",
+      "values": [
+        {
+          "id": "auto",
+          "label": { "en": "Auto" }
+        },
+        {
+          "id": "on",
+          "label": { "en": "On" }
+        },
+        {
+          "id": "off",
+          "label": { "en": "Off" }
+        }
+      ]
+    }
+  ],
   "images": {
     "small": "/drivers/hotwater/assets/images/small.png",
     "large": "/drivers/hotwater/assets/images/large.png",

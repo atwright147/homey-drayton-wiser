@@ -6,8 +6,8 @@ Items are grouped by area. The order within each group is not strict; pick accor
 
 ## Hub / System
 
-- [ ] Comfort mode toggle
-- [ ] Eco mode toggle
+- [x] Comfort mode toggle
+- [x] Eco mode toggle
 - [ ] Daylight saving toggle
 - [ ] Valve protection toggle
 - [ ] Boost all rooms action

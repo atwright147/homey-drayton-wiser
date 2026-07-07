@@ -25,6 +25,7 @@ class HotWaterDevice extends Homey.Device {
 
   async onInit(): Promise<void> {
     this.log('Wiser HotWater device init:', this.getName());
+    await this.setCapabilityValue('wiser_hotwater_mode', 'auto').catch(this.error);
     await this.migrateCapabilities();
     await this.setupHotWater();
   }
@@ -108,6 +109,7 @@ class HotWaterDevice extends Homey.Device {
 
     await this.setCapabilityValue('wiser_hotwater_state', state).catch(this.error);
     await this.setCapabilityValue('wiser_hotwater_mode', mode).catch(this.error);
+    await this.setSettings({ hotWaterMode: mode }).catch(this.error);
     await this.setCapabilityValue('wiser_hotwater_next_event', nextEvent ?? 'No schedule').catch(this.error);
     await this.setAvailable();
   }
@@ -132,6 +134,21 @@ class HotWaterDevice extends Homey.Device {
 
   async onUninit(): Promise<void> {
     await this.teardown();
+  }
+
+  async onSettings({
+    changedKeys,
+    newSettings,
+  }: {
+    oldSettings: Record<string, unknown>;
+    newSettings: Record<string, unknown>;
+    changedKeys: string[];
+  }): Promise<void> {
+    if (changedKeys.includes('hotWaterMode')) {
+      if (!this.hub) throw new Error('Hub not available');
+      await this.hub.getClient().setHotWaterMode(this.getHotWaterId(), newSettings.hotWaterMode as HotWaterMode);
+      await this.hub.poll();
+    }
   }
 
   async onDeleted(): Promise<void> {

@@ -1,7 +1,7 @@
 {
   "type": "enum",
   "title": {
-    "en": "Hot Water Mode"
+    "en": "Eco Mode"
   },
   "getable": true,
   "setable": true,
@@ -9,21 +9,15 @@
   "insights": false,
   "values": [
     {
-      "id": "auto",
+      "id": "off",
       "title": {
-        "en": "Auto"
+        "en": "Off"
       }
     },
     {
       "id": "on",
       "title": {
         "en": "On"
-      }
-    },
-    {
-      "id": "off",
-      "title": {
-        "en": "Off"
       }
     }
   ]

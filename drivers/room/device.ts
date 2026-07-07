@@ -14,6 +14,7 @@ interface HubApp extends Homey.App {
 }
 
 const MIN_TARGET_TEMP = 5;
+const ROOM_MODE_CAPABILITY = 'wiser_room_mode';
 
 function roomTemperature(room: WiserRoom): number | null {
   return validTemperatureFromApi(room.CalculatedTemperature);
@@ -41,6 +42,7 @@ class RoomDevice extends Homey.Device {
 
   async onInit(): Promise<void> {
     this.log('Wiser Room device init:', this.getName());
+    await this.setCapabilityValue(ROOM_MODE_CAPABILITY, 'auto').catch(this.error);
     await this.setupRoom();
   }
 
@@ -90,7 +92,7 @@ class RoomDevice extends Homey.Device {
       await this.hub.poll();
     });
 
-    this.registerCapabilityListener('wiser_room_mode', async (value: string) => {
+    this.registerCapabilityListener(ROOM_MODE_CAPABILITY, async (value: string) => {
       if (!this.hub) {
         throw new Error('Hub not available');
       }
@@ -122,7 +124,8 @@ class RoomDevice extends Homey.Device {
     } else {
       this.log('No humidity available for room', roomId);
     }
-    await this.setCapabilityValue('wiser_room_mode', mode).catch(this.error);
+    await this.setCapabilityValue(ROOM_MODE_CAPABILITY, mode).catch(this.error);
+    await this.setSettings({ roomMode: mode }).catch(this.error);
     await this.setAvailable();
   }
 
@@ -139,6 +142,21 @@ class RoomDevice extends Homey.Device {
 
   async onUninit(): Promise<void> {
     await this.teardown();
+  }
+
+  async onSettings({
+    changedKeys,
+    newSettings,
+  }: {
+    oldSettings: Record<string, unknown>;
+    newSettings: Record<string, unknown>;
+    changedKeys: string[];
+  }): Promise<void> {
+    if (changedKeys.includes('roomMode')) {
+      if (!this.hub) throw new Error('Hub not available');
+      await this.hub.getClient().setRoomMode(this.getRoomId(), newSettings.roomMode as RoomMode);
+      await this.hub.poll();
+    }
   }
 
   async onDeleted(): Promise<void> {

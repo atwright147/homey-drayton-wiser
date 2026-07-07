@@ -5,7 +5,8 @@
   },
   "getable": true,
   "setable": true,
-  "uiComponent": "picker",
+  "uiComponent": null,
+  "insights": false,
   "values": [
     {
       "id": "auto",
