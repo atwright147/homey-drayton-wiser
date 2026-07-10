@@ -266,6 +266,83 @@
             "en": "Use HTTPS (self-signed)"
           },
           "value": false
+        },
+        {
+          "id": "firmwareVersion",
+          "type": "text",
+          "label": {
+            "en": "Firmware Version"
+          },
+          "value": "",
+          "attr": {
+            "readonly": true
+          }
+        },
+        {
+          "id": "hardwareGeneration",
+          "type": "text",
+          "label": {
+            "en": "Hardware Generation"
+          },
+          "value": "",
+          "attr": {
+            "readonly": true
+          }
+        },
+        {
+          "id": "brandName",
+          "type": "text",
+          "label": {
+            "en": "Brand"
+          },
+          "value": "",
+          "attr": {
+            "readonly": true
+          }
+        },
+        {
+          "id": "serialNumber",
+          "type": "text",
+          "label": {
+            "en": "Serial Number"
+          },
+          "value": "",
+          "attr": {
+            "readonly": true
+          }
+        },
+        {
+          "id": "zigbeeModuleVersion",
+          "type": "text",
+          "label": {
+            "en": "Zigbee Module Version"
+          },
+          "value": "",
+          "attr": {
+            "readonly": true
+          }
+        },
+        {
+          "id": "zigbeeChannel",
+          "type": "text",
+          "label": {
+            "en": "Zigbee Channel"
+          },
+          "value": "",
+          "attr": {
+            "readonly": true
+          }
+        },
+        {
+          "id": "openthermStatus",
+          "type": "text",
+          "label": {
+            "en": "OpenTherm Status"
+          },
+          "value": "",
+          "attr": {
+            "readonly": true
+          }
         }
       ],
       "id": "hub"

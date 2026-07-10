@@ -15,9 +15,9 @@ Items are grouped by area. The order within each group is not strict; pick accor
 - [ ] Away mode target temperature slider
 - [ ] Heating mode sensor (Normal / Away)
 - [ ] Heating channel demand percentage sensor
-- [ ] Wi-Fi signal strength for the hub
-- [ ] OpenTherm connection status sensor
-- [ ] Expose more hub diagnostic attributes
+- [x] Wi-Fi signal strength for the hub
+- [x] OpenTherm connection status sensor (as diagnostic setting)
+- [x] Expose more hub diagnostic attributes
 
 ## Rooms / Climate
 

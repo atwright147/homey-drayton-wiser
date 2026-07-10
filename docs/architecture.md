@@ -53,7 +53,14 @@ drivers/hotwater/device.ts
 
 - Creates a `WiserClient` and `WiserHub` from store settings.
 - Registers with the manager.
-- Updates custom capabilities from the domain poll.
+- Updates custom capabilities from the domain poll:
+  - `wiser_away_mode`, `wiser_comfort_mode`, `wiser_eco_mode` — toggles
+  - `wiser_heating_active` — boolean sensor
+  - `wiser_cloud_connected` — boolean sensor
+  - `measure_signal` — percentage sensor
+- Also populates read-only diagnostic settings on each poll:
+  - `firmwareVersion`, `hardwareGeneration`, `brandName`, `serialNumber`
+  - `zigbeeModuleVersion`, `zigbeeChannel`, `openthermStatus`
 - Capability listener for `wiser_away_mode` writes back to the hub.
 
 ### `RoomDevice`
@@ -70,11 +77,20 @@ drivers/hotwater/device.ts
 Custom capabilities defined in `.homeycompose/capabilities/`:
 
 - `wiser_away_mode` — toggle
+- `wiser_comfort_mode` — binary toggle
+- `wiser_eco_mode` — binary toggle
 - `wiser_heating_active` — sensor
 - `wiser_cloud_connected` — sensor
 - `measure_signal` — sensor (percentage)
 - `wiser_room_mode` — enum (auto / manual / off)
 - `wiser_hotwater_mode` — enum (auto / on / off)
+- `wiser_hotwater_state` — boolean sensor
+- `wiser_hotwater_next_event` — string sensor
+
+Diagnostic settings (read-only, updated each poll on the hub device):
+
+- `firmwareVersion`, `hardwareGeneration`, `brandName`, `serialNumber`
+- `zigbeeModuleVersion`, `zigbeeChannel`, `openthermStatus`
 
 ## Discovery
 

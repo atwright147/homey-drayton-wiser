@@ -112,6 +112,15 @@ class HubDevice extends Homey.Device {
       await this.setCapabilityValue('wiser_heating_active', heatingActive).catch(this.error);
       await this.setCapabilityValue('wiser_cloud_connected', cloudConnected).catch(this.error);
       await this.setCapabilityValue('measure_signal', signal).catch(this.error);
+      await this.setSettings({
+        firmwareVersion: domain.System?.ActiveSystemVersion ?? '',
+        hardwareGeneration: domain.System?.HardwareGeneration != null ? String(domain.System.HardwareGeneration) : '',
+        brandName: domain.System?.BrandName ?? '',
+        serialNumber: controller?.SerialNumber ?? '',
+        zigbeeModuleVersion: domain.Zigbee?.ZigbeeModuleVersion ?? '',
+        zigbeeChannel: domain.Zigbee?.NetworkChannel != null ? String(domain.Zigbee.NetworkChannel) : '',
+        openthermStatus: domain.System?.OpenThermConnectionStatus ?? '',
+      }).catch(this.error);
       await this.setAvailable();
     } catch (err) {
       this.error('onPoll error:', err);
