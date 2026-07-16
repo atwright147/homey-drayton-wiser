@@ -5,7 +5,7 @@
   "sdk": 3,
   "runtime": "nodejs",
   "platforms": ["local"],
-  "brandColor": "#E87722",
+  "brandColor": "#009639",
   "name": {
     "en": "Drayton Wiser"
   },
