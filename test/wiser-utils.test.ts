@@ -4,6 +4,7 @@ import {
   fromApiTemp,
   validTemperatureFromApi,
   TEMP_ERROR,
+  TEMP_SENSOR_FAULT,
   TEMP_OFF,
   batteryPercentFromVoltage,
   trvBatteryPercent,
@@ -45,6 +46,9 @@ describe('fromApiTemp', () => {
   });
   it('returns the off value for TEMP_OFF', () => {
     expect(fromApiTemp(TEMP_OFF)).toBe(-20);
+  });
+  it('returns null for TEMP_SENSOR_FAULT sentinel', () => {
+    expect(fromApiTemp(TEMP_SENSOR_FAULT)).toBeNull();
   });
 });
 
@@ -161,6 +165,9 @@ describe('validTemperatureFromApi', () => {
 
   it('returns null for TEMP_OFF', () => {
     expect(validTemperatureFromApi(TEMP_OFF)).toBeNull();
+  });
+  it('returns null for TEMP_SENSOR_FAULT', () => {
+    expect(validTemperatureFromApi(TEMP_SENSOR_FAULT)).toBeNull();
   });
 });
 

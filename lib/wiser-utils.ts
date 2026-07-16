@@ -1,6 +1,7 @@
 import type { WiserSchedule } from './wiser-types';
 
 export const TEMP_ERROR = 2000;
+export const TEMP_SENSOR_FAULT = -32768;
 export const TEMP_OFF = -200;
 export const TEMP_MINIMUM = 5;
 export const TEMP_MAXIMUM = 30;
@@ -21,12 +22,12 @@ export function toApiBoostDelta(celsius: number): number {
 }
 
 export function fromApiTemp(apiTemp: number): number | null {
-  if (apiTemp === TEMP_ERROR) return null;
+  if (apiTemp === TEMP_ERROR || apiTemp === TEMP_SENSOR_FAULT) return null;
   return apiTemp / 10;
 }
 
 export function validTemperatureFromApi(apiTemp?: number): number | null {
-  if (apiTemp == null || apiTemp === TEMP_ERROR || apiTemp === TEMP_OFF) {
+  if (apiTemp == null || apiTemp === TEMP_ERROR || apiTemp === TEMP_OFF || apiTemp === TEMP_SENSOR_FAULT) {
     return null;
   }
   return apiTemp / 10;
