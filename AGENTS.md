@@ -65,7 +65,7 @@ homey app run --remote   # REQUIRED for pairing tests
 
 - `drivers/hub/` — HeatHub (complete, app-store-ready)
 - `drivers/room/` — Room thermostat (complete: temperature, setpoint, humidity from RoomStat, mode)
-- `drivers/hotwater/` — Hot water (complete: state, mode, next event, schedule widget)
+- `drivers/hotwater/` — Hot water (complete: state, mode, next event, 30/60-minute boost buttons, schedule widget)
 - Planned: iTRV, RoomStat
 - Drivers are SDK v3; follow the `drivers/hub/` pattern.
 

@@ -86,6 +86,9 @@ Custom capabilities defined in `.homeycompose/capabilities/`:
 - `wiser_hotwater_mode` — enum (auto / on / off)
 - `wiser_hotwater_state` — boolean sensor
 - `wiser_hotwater_next_event` — string sensor
+- `wiser_hotwater_boost_30` — button (30-minute override)
+- `wiser_hotwater_boost_60` — button (60-minute override)
+- `wiser_hotwater_boost_cancel` — button (clear override)
 
 Diagnostic settings (read-only, updated each poll on the hub device):
 
@@ -134,10 +137,12 @@ The Hot Water driver uses the default system templates (`list_devices` / `add_de
 - Registers as a listener on the parent Hub's `WiserHub` via `WiserHubManager`.
 - Falls back to creating its own `WiserClient`/`WiserHub` if the parent Hub is unavailable.
 - Device class: `other`.
-- Capabilities: `wiser_hotwater_state`, `wiser_hotwater_mode`, `wiser_hotwater_next_event`.
+- Capabilities: `wiser_hotwater_state`, `wiser_hotwater_mode`, `wiser_hotwater_next_event`, `wiser_hotwater_boost_30`, `wiser_hotwater_boost_60`, `wiser_hotwater_boost_cancel`.
 - `wiser_hotwater_state` shows whether the hot water is currently heating (`WaterHeatingState` / `HotWaterRelayState`).
 - Writing `wiser_hotwater_mode` sends the mapped mode back to the hub.
 - `wiser_hotwater_next_event` shows the next scheduled On/Off change from the hot water's `ScheduleId`.
+- The boost buttons set/cancel a manual override with `setHotWaterOverride` / `cancelHotWaterOverride` and poll afterwards. Fixed 30/60-minute durations keep all three controls in the button panel.
+- `onInit` migrates existing devices: deprecated boost capabilities are removed (non-fatal) and the fixed buttons are added.
 
 ## Widgets
 

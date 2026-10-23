@@ -76,7 +76,21 @@ homey app run --remote
 3. Select the rooms to add from the standard `list_devices` view.
 4. If the room has a wall-mounted RoomStat, the device will also report humidity.
 
-Note: Homey does not automatically add new capabilities to existing devices. If you add a capability to the Room driver after devices are paired, delete and re-pair the room device. Delete `.homeybuild` if the change is not reflected.
+Note: Homey does not automatically add new capabilities to existing devices. The HotWater driver migrates its own capabilities in `onInit`; the Room driver does not, so delete and re-pair a room device if you add a capability to it. Delete `.homeybuild` if the change is not reflected.
+
+## Capability Migration
+
+Device capabilities are part of the pairing data, so capabilities added later are not present on already-paired devices. `HotWaterDevice.migrateCapabilities()` runs in `onInit` and:
+
+1. Removes legacy capabilities such as `onoff` and the deprecated boost controls.
+2. Adds any missing current capabilities.
+
+Two Homey behaviours matter when doing this:
+
+- `removeCapability(id)` throws `Invalid Capability: <id>` with `statusCode: 404` if `id` is not defined in the app manifest. Keep the deprecated capability definition in `.homeycompose/capabilities/` until all devices have migrated, even though it is not listed in `driver.compose.json`.
+- An uncaught error in `onInit` marks the device unavailable. Wrap best-effort cleanup in `try/catch` so a failed removal is logged instead of aborting initialisation.
+
+When adding a capability to a driver, add it to `driver.compose.json` for new pairings and to the driver's migration list for existing devices.
 
 ## Logs
 
@@ -98,7 +112,8 @@ When running `homey app run --remote`, logs stream to the terminal. Look for:
 | `onPair` never logged | Stale build or wrong pairing approach | Delete `.homeybuild`, use custom view |
 | `Could not load script: /js/homey.pair.js` | Custom view includes `/homey.js` | Remove the script tag |
 | `verifyConnection` fails | Wrong secret or short timeout | Double-check secret; use default client timeouts |
-| `Invalid Capability: ...` | Device was paired before the capability was added | Delete the device and re-pair; delete `.homeybuild` if needed |
+| `Invalid Capability: ...` | Device was paired before the capability was added, or a deprecated definition was removed from the manifest too early | Add migration logic; keep deprecated definitions in `.homeycompose/capabilities/`; delete and re-pair as a last resort |
+| Device unavailable after adding a capability | `onInit` threw while adding/removing a capability | Check logs for the error; make cleanup non-fatal; see Capability Migration |
 | Old code still running | `.homeybuild` stale | Delete `.homeybuild` and re-run |
 | Widget shows "Error loading schedule" | Widget API not receiving `deviceId` | Use a path parameter (`/:deviceId`) instead of query/body parameters |
 | Widget shows "Device not found" | Looking up by pairing `data.id` instead of Homey ID | Use `device.getId()` in the widget API handler |

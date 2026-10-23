@@ -1,5 +1,5 @@
 {
   "1.0.0": {
-    "en": "First version!"
+    "en": "Initial release: local control for the Drayton Wiser HeatHub, rooms and hot water, including room and hot water boost Flow actions, hot water boost buttons and a weekly hot water schedule widget."
   }
 }

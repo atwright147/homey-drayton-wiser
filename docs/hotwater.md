@@ -35,7 +35,7 @@ The `drivers/hotwater/` driver exposes a Wiser hot water cylinder as a Homey dev
 
 ## Polling
 
-`HotWaterDevice` registers a listener on the parent hub's `WiserHub` via `WiserHubManager`. The listener receives the merged domain on every poll and updates the three capabilities. If the parent Hub device is unavailable, the HotWater device falls back to creating its own `WiserClient`/`WiserHub`.
+`HotWaterDevice` registers a listener on the parent hub's `WiserHub` via `WiserHubManager`. The listener receives the merged domain on every poll and updates `wiser_hotwater_state`, `wiser_hotwater_mode`, and `wiser_hotwater_next_event`. If the parent Hub device is unavailable, the HotWater device falls back to creating its own `WiserClient`/`WiserHub`.
 
 ## Mode Writes
 
@@ -43,15 +43,29 @@ Writing `wiser_hotwater_mode` calls `WiserClient.setHotWaterMode(hotWaterId, mod
 
 ## Boost Controls
 
-The button panel exposes three actions:
+The hot water device exposes three buttons in the Homey button panel:
 
-- `wiser_hotwater_boost_30` calls `WiserClient.setHotWaterOverride(hotWaterId, 30)` and then triggers a poll.
-- `wiser_hotwater_boost_60` calls `WiserClient.setHotWaterOverride(hotWaterId, 60)` and then triggers a poll.
-- `wiser_hotwater_boost_cancel` calls `WiserClient.cancelHotWaterOverride(hotWaterId)` and then triggers a poll.
+| Button | Capability | Behaviour |
+|--------|------------|-----------|
+| Boost 30 min | `wiser_hotwater_boost_30` | `setHotWaterOverride(hotWaterId, 30)`, then poll |
+| Boost 60 min | `wiser_hotwater_boost_60` | `setHotWaterOverride(hotWaterId, 60)`, then poll |
+| Cancel Boost | `wiser_hotwater_boost_cancel` | `cancelHotWaterOverride(hotWaterId)`, then poll |
 
-These use the same client methods as the `boost_hot_water` Flow action.
+The durations are fixed so all three controls render together in the button panel. A picker or slider capability would be rendered in a separate panel on the device screen.
 
-The deprecated `wiser_hotwater_boost` and `wiser_hotwater_boost_duration` capability definitions remain in the manifest so existing devices can remove them cleanly during migration. They are not listed in the driver's `capabilities`, so they are not added to new devices.
+A boost sets a manual hot water override on the hub with `SetPoint` 1100 for the chosen number of minutes. It does not change `wiser_hotwater_mode`; the mode capability continues to report the schedule/manual state from the hub. Cancel clears the override and returns the cylinder to its schedule. Both actions use the same client methods as the `boost_hot_water` Flow action.
+
+Button capabilities are action-only and do not hold state, so polling never overwrites them.
+
+### Migration
+
+Earlier development builds exposed `wiser_hotwater_boost` (single button) and `wiser_hotwater_boost_duration` (picker). `migrateCapabilities()` removes those from existing devices on `onInit` and adds the three fixed buttons.
+
+Homey throws `Invalid Capability` (404) when removing a capability whose definition is no longer in the app manifest, and an uncaught error in `onInit` marks the device unavailable. For that reason both deprecated capability definitions remain in `.homeycompose/capabilities/`, and the removal is wrapped in `try/catch`. They are not listed in `driver.compose.json`, so new devices never receive them.
+
+## Tests
+
+`test/drivers/hotwater-device.test.ts` covers capability migration, the 30- and 60-minute boosts, cancel, removal failures, and hub-unavailable errors.
 
 ## Schedule
 

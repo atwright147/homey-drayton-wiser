@@ -4,7 +4,7 @@
 
 The HeatHub driver is feature-complete for a standalone app and app-store-ready.
 The Room driver is implemented and exposes temperature, target temperature, humidity, and mode for each Wiser Room.
-The HotWater driver is implemented and exposes state, mode, and next event. The `wiser-schedule` dashboard widget renders the weekly hot water schedule.
+The HotWater driver is implemented and exposes state, mode, next event, and fixed 30/60-minute boost buttons with cancel. The `wiser-schedule` dashboard widget renders the weekly hot water schedule.
 
 ## Planned Drivers
 
@@ -28,30 +28,17 @@ Create a device for each Wiser RoomStat.
 
 Similar to iTRV but wall-mounted and may include humidity.
 
-### 3. HotWater Driver
+### HotWater Driver
 
-Create a device for each hot water cylinder (`domain.HotWater[]`).
-
-Capabilities:
-
-- `wiser_hotwater_state` (currently heating)
-- `wiser_hotwater_mode` (auto / on / off)
-- `wiser_hotwater_next_event` (next scheduled on/off change)
-
-Widgets:
-
-- `wiser-schedule` dashboard widget showing the full weekly hot water schedule
-
-Actions:
-
-- Set mode
+Implemented in `drivers/hotwater/`. See [hotwater.md](./hotwater.md) for capabilities, the boost buttons, and the schedule widget.
 
 ## Suggested Implementation Order
 
 1. ✅ HotWater driver (small, single data source)
 2. ✅ `wiser-schedule` widget for HotWater
-3. iTRV driver
-4. RoomStat driver
+3. ✅ Hot water boost buttons (30/60 minutes + cancel)
+4. iTRV driver
+5. RoomStat driver
 
 ## Technical Considerations
 

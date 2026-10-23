@@ -34,8 +34,10 @@ Items are grouped by area. The order within each group is not strict; pick accor
 ## Hot Water
 
 - [x] Boost hot water action (duration) — Flow action `boost_hot_water`
+- [x] Boost hot water device buttons (30 / 60 minutes) — `wiser_hotwater_boost_30`, `wiser_hotwater_boost_60`
+- [x] Cancel hot water override — device button `wiser_hotwater_boost_cancel`
 - [ ] Override hot water action
-- [ ] Cancel hot water override action
+- [ ] Cancel hot water override Flow action
 - [ ] Hot water operation mode sensor (Auto / Manual / Boost / Override)
 - [ ] External tank temperature sensor climate control
 

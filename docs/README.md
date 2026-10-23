@@ -7,6 +7,8 @@ This folder contains documentation for developers/agents working on the Homey Pr
 - [Architecture](./architecture.md) — overall structure and design decisions
 - [Pairing](./pairing.md) — how HeatHub pairing works, including mDNS discovery
 - [Development](./development.md) — how to run, test, and debug the app, including Flow cards
+- [Hot Water](./hotwater.md) — hot water capabilities, boost buttons, and schedule widget
+- [Widget](./widget.md) — the `wiser-schedule` dashboard widget
 - [Next Steps](./next-steps.md) — planned drivers and features
 - [TODO](./todo.md) — missing features compared to the Home Assistant Wiser integration
 
@@ -20,14 +22,17 @@ This folder contains documentation for developers/agents working on the Homey Pr
 
 ## Current State
 
-The HeatHub driver is complete and publishable as a standalone app. It can:
+Three drivers are implemented:
 
-- Pair via mDNS discovery or manual IP
-- Authenticate with the hub secret
-- Poll the hub every 30 seconds
-- Expose away mode, heating active, cloud connection, and signal strength
+- **HeatHub** — pairs via mDNS discovery or manual IP, authenticates with the hub secret, polls every 30 seconds, and exposes away mode, heating active, cloud connection, and signal strength.
+- **Room** — temperature, target temperature, humidity from a linked RoomStat, and the room mode.
+- **Hot Water** — state, mode, next scheduled event, and fixed 30/60-minute boost buttons with cancel.
 
-All other Wiser device types (rooms, iTRVs, RoomStats, hot water) are planned.
+The `wiser-schedule` dashboard widget renders the weekly hot water schedule.
+
+Flow actions: **Boost heating** (`boost_room`) and **Boost hot water** (`boost_hot_water`).
+
+iTRV and RoomStat drivers are planned.
 
 ## Important Notes
 
@@ -35,3 +40,4 @@ All other Wiser device types (rooms, iTRVs, RoomStats, hot water) are planned.
 - The custom pairing view does **not** load `/homey.js`. `Homey` is injected automatically.
 - The `login_credentials` system template was abandoned because `onPair` was never invoked in our environment.
 - Homey App Store submissions that require IP entry when discovery could be used will be rejected. mDNS discovery is mandatory.
+- Capabilities added later are not present on already-paired devices. Drivers migrate them in `onInit`; see [development.md](./development.md#capability-migration).
