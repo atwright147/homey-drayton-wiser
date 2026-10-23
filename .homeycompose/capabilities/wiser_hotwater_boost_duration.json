@@ -1,0 +1,36 @@
+{
+  "type": "enum",
+  "title": {
+    "en": "Boost Duration"
+  },
+  "getable": true,
+  "setable": true,
+  "uiComponent": "picker",
+  "insights": false,
+  "values": [
+    {
+      "id": "30",
+      "title": {
+        "en": "30 minutes"
+      }
+    },
+    {
+      "id": "60",
+      "title": {
+        "en": "60 minutes"
+      }
+    },
+    {
+      "id": "90",
+      "title": {
+        "en": "90 minutes"
+      }
+    },
+    {
+      "id": "120",
+      "title": {
+        "en": "120 minutes"
+      }
+    }
+  ]
+}

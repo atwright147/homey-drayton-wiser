@@ -6,7 +6,10 @@
   "capabilities": [
     "wiser_hotwater_state",
     "wiser_hotwater_mode",
-    "wiser_hotwater_next_event"
+    "wiser_hotwater_next_event",
+    "wiser_hotwater_boost_30",
+    "wiser_hotwater_boost_60",
+    "wiser_hotwater_boost_cancel"
   ],
   "platforms": ["local"],
   "connectivity": ["lan"],

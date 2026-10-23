@@ -105,7 +105,10 @@
       "capabilities": [
         "wiser_hotwater_state",
         "wiser_hotwater_mode",
-        "wiser_hotwater_next_event"
+        "wiser_hotwater_next_event",
+        "wiser_hotwater_boost_30",
+        "wiser_hotwater_boost_60",
+        "wiser_hotwater_boost_cancel"
       ],
       "platforms": [
         "local"
@@ -555,6 +558,82 @@
       "insightsTitleFalse": {
         "en": "Heating turned off"
       }
+    },
+    "wiser_hotwater_boost": {
+      "type": "boolean",
+      "title": {
+        "en": "Boost Hot Water"
+      },
+      "getable": false,
+      "setable": true,
+      "uiComponent": "button",
+      "insights": false
+    },
+    "wiser_hotwater_boost_30": {
+      "type": "boolean",
+      "title": {
+        "en": "Boost 30 min"
+      },
+      "getable": false,
+      "setable": true,
+      "uiComponent": "button",
+      "insights": false
+    },
+    "wiser_hotwater_boost_60": {
+      "type": "boolean",
+      "title": {
+        "en": "Boost 60 min"
+      },
+      "getable": false,
+      "setable": true,
+      "uiComponent": "button",
+      "insights": false
+    },
+    "wiser_hotwater_boost_cancel": {
+      "type": "boolean",
+      "title": {
+        "en": "Cancel Boost"
+      },
+      "getable": false,
+      "setable": true,
+      "uiComponent": "button",
+      "insights": false
+    },
+    "wiser_hotwater_boost_duration": {
+      "type": "enum",
+      "title": {
+        "en": "Boost Duration"
+      },
+      "getable": true,
+      "setable": true,
+      "uiComponent": "picker",
+      "insights": false,
+      "values": [
+        {
+          "id": "30",
+          "title": {
+            "en": "30 minutes"
+          }
+        },
+        {
+          "id": "60",
+          "title": {
+            "en": "60 minutes"
+          }
+        },
+        {
+          "id": "90",
+          "title": {
+            "en": "90 minutes"
+          }
+        },
+        {
+          "id": "120",
+          "title": {
+            "en": "120 minutes"
+          }
+        }
+      ]
     },
     "wiser_hotwater_mode": {
       "type": "enum",

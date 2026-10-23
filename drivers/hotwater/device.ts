@@ -9,6 +9,11 @@ interface HubApp extends Homey.App {
   hubManager: WiserHubManager;
 }
 
+const BOOST_30_CAPABILITY = 'wiser_hotwater_boost_30';
+const BOOST_60_CAPABILITY = 'wiser_hotwater_boost_60';
+const CANCEL_BOOST_CAPABILITY = 'wiser_hotwater_boost_cancel';
+const DEPRECATED_BOOST_CAPABILITIES = ['wiser_hotwater_boost_duration', 'wiser_hotwater_boost'];
+
 function hotWaterState(hotWater: WiserHotWater): boolean {
   if (hotWater.WaterHeatingState != null) {
     return hotWater.WaterHeatingState === 'On';
@@ -34,11 +39,26 @@ class HotWaterDevice extends Homey.Device {
     if (this.hasCapability('onoff')) {
       await this.removeCapability('onoff');
     }
-    if (!this.hasCapability('wiser_hotwater_state')) {
-      await this.addCapability('wiser_hotwater_state');
+    for (const capability of DEPRECATED_BOOST_CAPABILITIES) {
+      if (this.hasCapability(capability)) {
+        try {
+          await this.removeCapability(capability);
+        } catch (err) {
+          this.error('Failed to remove deprecated capability', capability, err);
+        }
+      }
     }
-    if (!this.hasCapability('wiser_hotwater_next_event')) {
-      await this.addCapability('wiser_hotwater_next_event');
+    const capabilities = [
+      'wiser_hotwater_state',
+      'wiser_hotwater_next_event',
+      BOOST_30_CAPABILITY,
+      BOOST_60_CAPABILITY,
+      CANCEL_BOOST_CAPABILITY,
+    ];
+    for (const capability of capabilities) {
+      if (!this.hasCapability(capability)) {
+        await this.addCapability(capability);
+      }
     }
   }
 
@@ -87,6 +107,28 @@ class HotWaterDevice extends Homey.Device {
       await this.hub.getClient().setHotWaterMode(hotWaterId, value as HotWaterMode);
       await this.hub.poll();
     });
+
+    this.registerCapabilityListener(BOOST_30_CAPABILITY, async () => this.boostHotWater(30));
+
+    this.registerCapabilityListener(BOOST_60_CAPABILITY, async () => this.boostHotWater(60));
+
+    this.registerCapabilityListener(CANCEL_BOOST_CAPABILITY, async () => this.cancelHotWaterBoost());
+  }
+
+  private async boostHotWater(minutes: number): Promise<void> {
+    if (!this.hub) {
+      throw new Error('Hub not available');
+    }
+    await this.hub.getClient().setHotWaterOverride(this.getHotWaterId(), minutes);
+    await this.hub.poll();
+  }
+
+  private async cancelHotWaterBoost(): Promise<void> {
+    if (!this.hub) {
+      throw new Error('Hub not available');
+    }
+    await this.hub.getClient().cancelHotWaterOverride(this.getHotWaterId());
+    await this.hub.poll();
   }
 
   private async onPoll(domain: WiserDomain): Promise<void> {

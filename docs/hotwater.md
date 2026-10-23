@@ -25,6 +25,9 @@ The `drivers/hotwater/` driver exposes a Wiser hot water cylinder as a Homey dev
 | `wiser_hotwater_state` | boolean | Currently heating (`WaterHeatingState` or `HotWaterRelayState` is `On`) |
 | `wiser_hotwater_mode` | enum | `auto`, `on`, `off` (maps to Wiser `Auto`, `On`, `Off`) |
 | `wiser_hotwater_next_event` | string | Next scheduled On/Off change, e.g. `Today 22:30 (Off)` |
+| `wiser_hotwater_boost_30` | button | Starts a 30-minute hot water override |
+| `wiser_hotwater_boost_60` | button | Starts a 60-minute hot water override |
+| `wiser_hotwater_boost_cancel` | button | Cancels the active hot water override and returns to the schedule |
 
 ## Device Class
 
@@ -37,6 +40,18 @@ The `drivers/hotwater/` driver exposes a Wiser hot water cylinder as a Homey dev
 ## Mode Writes
 
 Writing `wiser_hotwater_mode` calls `WiserClient.setHotWaterMode(hotWaterId, mode)` and then triggers a poll so the capability values update immediately.
+
+## Boost Controls
+
+The button panel exposes three actions:
+
+- `wiser_hotwater_boost_30` calls `WiserClient.setHotWaterOverride(hotWaterId, 30)` and then triggers a poll.
+- `wiser_hotwater_boost_60` calls `WiserClient.setHotWaterOverride(hotWaterId, 60)` and then triggers a poll.
+- `wiser_hotwater_boost_cancel` calls `WiserClient.cancelHotWaterOverride(hotWaterId)` and then triggers a poll.
+
+These use the same client methods as the `boost_hot_water` Flow action.
+
+The deprecated `wiser_hotwater_boost` and `wiser_hotwater_boost_duration` capability definitions remain in the manifest so existing devices can remove them cleanly during migration. They are not listed in the driver's `capabilities`, so they are not added to new devices.
 
 ## Schedule
 

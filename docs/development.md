@@ -141,6 +141,7 @@ This runs unit tests for `lib/` and the driver Flow-card registration.
 
 - Flow action: **Boost hot water**
 - Arguments: duration (minutes)
+- Device buttons: **Boost 30 min**, **Boost 60 min**, and **Cancel Boost**.
 - Sends to the hub:
   ```json
   { "RequestOverride": { "Type": "Manual", "SetPoint": 1100, "DurationMinutes": <duration> } }
