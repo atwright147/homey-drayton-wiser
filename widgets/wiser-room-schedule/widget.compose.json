@@ -1,0 +1,12 @@
+{
+  "name": { "en": "Wiser Room Schedule" },
+  "height": 240,
+  "devices": {
+    "type": "app",
+    "singular": true,
+    "filter": { "capabilities": "wiser_room_mode" }
+  },
+  "api": {
+    "getSchedule": { "method": "GET", "path": "/:deviceId" }
+  }
+}

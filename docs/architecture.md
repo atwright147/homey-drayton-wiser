@@ -19,6 +19,8 @@ The paired HeatHub owns one `WiserClient` and one polling `WiserHub`. `app.ts` c
 | `lib/wiser-roomstat.ts` | SDK-free RoomStat/device/room mapping and validation |
 | `drivers/hotwater/` | Hot water pairing, state/mode/next event, and boost controls |
 | `widgets/wiser-schedule/` | Read-only hot water schedule dashboard widget |
+| `widgets/wiser-room-schedule/` | Read-only room heating schedule dashboard widget |
+| `lib/wiser-room-schedule.ts` | SDK-free heating schedule parsing and next-change search |
 
 ### Client and request lifecycle
 

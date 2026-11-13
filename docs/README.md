@@ -29,7 +29,7 @@ Four drivers are implemented:
 - **RoomStat** — individual physical thermostat temperature, humidity, estimated battery percentage and signal strength; read-only, using its parent HeatHub.
 - **Hot Water** — state, mode, next scheduled event, and fixed 30/60-minute boost buttons with cancel.
 
-The `wiser-schedule` dashboard widget renders the weekly hot water schedule and hides stale data when the parent hub is unavailable. Next-event labels use the Homey timezone.
+The `wiser-schedule` and `wiser-room-schedule` dashboard widgets render hot-water and room heating schedules respectively, and hide stale data when the parent hub is unavailable. Next-event labels use the Homey timezone.
 
 Flow actions: **Boost heating** (`boost_room`) and **Boost hot water** (`boost_hot_water`).
 

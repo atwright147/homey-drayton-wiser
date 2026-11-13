@@ -76,3 +76,11 @@ The widget reloads every 60 seconds and when the `settings` event fires.
 - `device.getData().id` is the pairing data, not the Homey device ID. Use `device.getId()` for widget lookups.
 - Use `Homey.ready({ height: 240 })` to request the widget height. The actual rendered height may be fixed by the dashboard; design the UI to scroll or truncate gracefully.
 - The widget HTML must not include `<script src="/homey.js">`. The `Homey` global is injected by the Homey runtime.
+
+## `wiser-room-schedule`
+
+Read-only dashboard widget for a selected Wiser Room. It displays the room's scheduled target temperature, the next scheduled setpoint change, and the weekly heating schedule. It uses `widgets/wiser-room-schedule/widget.compose.json`, `api.js` and `public/index.html`; its device selector filters for `wiser_room_mode`.
+
+The API matches `Homey.getDeviceIds()[0]` against the Room device's Homey ID, reads `store.hubId` and `store.roomId`, and uses only the shared hub cache. An unavailable hub or missing room returns no stale schedule or target. The room's `ScheduleId` selects a `Heating` schedule. `lib/wiser-room-schedule.ts` accepts v2 parallel `Time` (minutes after midnight) and `DegreesC` arrays, and legacy `SetPoints` with HHMM `Time` values. Temperature values are tenths of a degree; `-200` means Off. Invalid slots are skipped and the remaining changes are ordered by time.
+
+The next change is found by scanning the weekly schedule in Homey's timezone, including day and week rollover. A timezone error leaves the weekly slots visible and labels the next change `Timezone unavailable`. The widget refreshes every 60 seconds and on settings changes. It requests 240px height and scrolls the schedule area. It never writes to the hub. Live widget selection, layout and time values still need checking on Homey.

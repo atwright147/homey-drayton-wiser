@@ -5,7 +5,7 @@
 The HeatHub driver pairs via mDNS or manual IP, verifies discovered address changes against its ChipId, and owns the polling hub shared by child devices. Its availability follows poll health; the dashboard widget hides stale data while the hub is unavailable.
 The Room driver is implemented and exposes temperature, target temperature, humidity, and mode for each Wiser Room.
 The separate RoomStat driver exposes physical thermostat temperature, humidity, estimated battery percentage, and signal strength through the same parent hub.
-The HotWater driver is implemented and exposes state, mode, next event, and fixed 30/60-minute boost buttons with cancel. The `wiser-schedule` dashboard widget renders the weekly hot water schedule.
+The HotWater driver is implemented and exposes state, mode, next event, and fixed 30/60-minute boost buttons with cancel. The `wiser-schedule` and `wiser-room-schedule` dashboard widgets render hot-water and room heating schedules.
 
 ## Planned Drivers
 

@@ -88,7 +88,7 @@ Items are grouped by area. The order within each group is not strict; pick accor
 
 ## Schedules
 
-- [ ] Get schedule for rooms, hot water, lights, and shutters
+- [x] View room and hot-water schedules in dashboard widgets; light and shutter schedules remain planned
 - [ ] Set schedule for rooms, hot water, lights, and shutters
 - [ ] Copy schedule between devices
 - [ ] Assign / unassign schedule
