@@ -2,9 +2,9 @@
 
 ## Overview
 
-This Homey Pro app uses the Wiser HeatHub LAN REST API and mDNS discovery. The implemented devices are HeatHub, Room, and Hot Water. iTRV and RoomStat drivers are planned.
+This Homey Pro app uses the Wiser HeatHub LAN REST API and mDNS discovery. The implemented devices are HeatHub, Room, RoomStat, and Hot Water. The iTRV driver is planned.
 
-The paired HeatHub owns one `WiserClient` and one polling `WiserHub`. `app.ts` creates a single `WiserHubManager`; room and hot water devices subscribe to their parent hub through that manager. Child devices can start before the hub device, and their subscriptions attach when it registers. They do not start separate polling clients.
+The paired HeatHub owns one `WiserClient` and one polling `WiserHub`. `app.ts` creates a single `WiserHubManager`; room, RoomStat and hot water devices subscribe to their parent hub through that manager. Child devices can start before the hub device, and their subscriptions attach when it registers. They do not start separate polling clients.
 
 ## Components
 
@@ -15,6 +15,8 @@ The paired HeatHub owns one `WiserClient` and one polling `WiserHub`. `app.ts` c
 | `lib/wiser-hub-manager.ts` | One hub per paired HeatHub ID, pending child subscriptions, replacement, and teardown |
 | `drivers/hub/` | Pairing, discovery identity, hub settings, capabilities, and diagnostics |
 | `drivers/room/` | Room pairing, temperature/humidity/mode, and setpoint writes |
+| `drivers/roomstat/` | Physical RoomStat pairing, temperature/humidity/battery/signal, and availability |
+| `lib/wiser-roomstat.ts` | SDK-free RoomStat/device/room mapping and validation |
 | `drivers/hotwater/` | Hot water pairing, state/mode/next event, and boost controls |
 | `widgets/wiser-schedule/` | Read-only hot water schedule dashboard widget |
 
@@ -32,7 +34,7 @@ The manager exposes `register`, `unregister`, `get`, `subscribe`, `unsubscribe`,
 
 `WiserHub` prevents concurrent polls, queues a pending poll, and gives each domain listener the latest successful domain. A new listener receives the cached domain when one exists. A client change clears that cache, cancels old requests, and starts a poll with the new client while preserving subscriptions. Stale responses from a previous client or hub generation are discarded.
 
-Health starts as `not_ready`. Failure before the first successful poll marks the hub unavailable immediately. After success, authentication failure is immediate; connection failure marks it unavailable after three consecutive failures or when the last success is at least two poll intervals old. Unavailable health clears the cached domain. A successful poll restores availability. Hub, room, and hot water devices reflect the parent health, while the widget withholds stale schedule data. Listeners are removed on device teardown.
+Health starts as `not_ready`. Failure before the first successful poll marks the hub unavailable immediately. After success, authentication failure is immediate; connection failure marks it unavailable after three consecutive failures or when the last success is at least two poll intervals old. Unavailable health clears the cached domain. A successful poll restores availability. Hub, room, RoomStat, and hot water devices reflect the parent health, while the widget withholds stale schedule data. Listeners are removed on device teardown.
 
 ### Device settings and writes
 
@@ -49,6 +51,14 @@ The custom Hub pairing view sends `{ ip, secret, discoveryId }` when a discovere
 After pairing, the Hub device watches discovery results and address changes. It verifies `BrandName` and `ChipId` at the candidate address before updating `store.address` and switching the shared hub client. Existing ChipId-based devices without `store.discoveryId` can acquire one after a verified discovery match. Address-based legacy IDs cannot be matched this way and keep their stored address. A manually paired device with a ChipId may also acquire a discovery ID when its hub is later found; manual entry does not lock its address.
 
 Room and hot water pairing enumerate items from paired hubs. They use the managed cached domain, with an on-demand poll when needed. Hot water pairing can make a temporary direct poll if the managed hub has no domain. Pairing stores `hubId` and the Wiser room or hot water ID; these link the child to its parent at runtime.
+
+### Physical RoomStats
+
+The RoomStat driver is a read-only sensor, separate from the room thermostat control. `lib/wiser-roomstat.ts` joins `Device` entries whose `ProductType` is `RoomStat` with `RoomStat` measurements on their shared `id`. `Room.RoomStatId` supplies the optional room name; neither naming nor room reassignment changes the paired ID. Pairing stores only `hubId` and `roomStatId`, with a hub-scoped `roomstat-{hubId}-{roomStatId}` data ID, and uses the managed cache or an on-demand shared poll. A failed hub does not prevent listing devices from other hubs.
+
+Temperature uses the RoomStat's own measured value in tenths of a degree, not the room's calculated temperature. Humidity is already a percentage. Battery percentage uses the existing RoomStat voltage estimate (2.7 V full, 1.7 V empty), falling back to recognized coarse battery levels; it is an estimate, not a measured state of charge. Signal prefers valid negative `ReceptionOfDevice.Rssi`, then `ReceptionOfController.Rssi`, then the displayed-strength mapping. Explicit Offline or NoSignal reports force signal to zero.
+
+Missing or invalid readings become null. A missing physical device or measurement record marks the Homey device unavailable; an explicit Offline status also marks it unavailable and clears temperature/humidity. Returning records restore availability. The device subscribes to parent domain and health updates, tolerates startup before the parent and hub/client replacement, checks for stale domains between updates, and removes both subscriptions on teardown. It creates no private client or polling timer. Existing Room devices and their controls are unchanged.
 
 ## Capabilities and schedules
 

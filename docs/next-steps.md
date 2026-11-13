@@ -4,6 +4,7 @@
 
 The HeatHub driver pairs via mDNS or manual IP, verifies discovered address changes against its ChipId, and owns the polling hub shared by child devices. Its availability follows poll health; the dashboard widget hides stale data while the hub is unavailable.
 The Room driver is implemented and exposes temperature, target temperature, humidity, and mode for each Wiser Room.
+The separate RoomStat driver exposes physical thermostat temperature, humidity, estimated battery percentage, and signal strength through the same parent hub.
 The HotWater driver is implemented and exposes state, mode, next event, and fixed 30/60-minute boost buttons with cancel. The `wiser-schedule` dashboard widget renders the weekly hot water schedule.
 
 ## Planned Drivers
@@ -22,11 +23,9 @@ Capabilities:
 - `measure_signal`
 - Custom capability for valve position
 
-### 2. RoomStat Driver
+### RoomStat Driver — implemented
 
-Create a device for each Wiser RoomStat.
-
-Similar to iTRV but wall-mounted and may include humidity.
+Implemented in `drivers/roomstat/` as a read-only sensor. Pairing lists physical RoomStats from paired hubs, including unassigned units. See [pairing.md](./pairing.md#roomstat-pairing) for mapping, limitations and outstanding hardware checks. Lock and identify controls remain future work.
 
 ### HotWater Driver
 
@@ -38,7 +37,7 @@ Implemented in `drivers/hotwater/`. See [hotwater.md](./hotwater.md) for capabil
 2. ✅ `wiser-schedule` widget for HotWater
 3. ✅ Hot water boost buttons (30/60 minutes + cancel)
 4. iTRV driver
-5. RoomStat driver
+5. ✅ RoomStat driver (temperature, humidity, battery and signal; live pairing checks outstanding)
 
 ## Technical Considerations
 

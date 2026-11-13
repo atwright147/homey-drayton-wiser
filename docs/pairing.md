@@ -36,6 +36,7 @@ For live verification, use `homey app run --remote` and test address-only repair
 | Device | Pairing data and store | Settings |
 |--------|------------------------|----------|
 | HeatHub | `data.id`: ChipId or address; `store.address`, `store.secret`, optional `store.discoveryId` and `store.chipId` | `pollInterval` (seconds), `useHttps`, comfort/eco controls, and read-only diagnostics |
+| RoomStat | `data.id`: `roomstat-{hubId}-{roomStatId}`; `store.hubId`, `store.roomStatId` | None (read-only sensor) |
 | Room | `data.id`: `room-{hubId}-{roomId}`; `store.hubId`, `store.roomId`, plus address/secret/HTTPS snapshots | `roomMode` |
 | Hot Water | `data.id`: `hotwater-{hubId}-{hotWaterId}`; `store.hubId`, `store.hotWaterId`, plus address/secret/HTTPS snapshots | `hotWaterMode` |
 
@@ -44,6 +45,14 @@ The child store snapshots are pairing data. At runtime, child polling and writes
 ## Child pairing
 
 Room and Hot Water use the standard `list_devices` / `add_devices` views. Each driver enumerates items from paired HeatHubs. Room pairing reads a cached domain or polls the managed hub. Hot Water pairing also has a temporary direct-poll fallback if the managed hub has no domain. An unavailable hub may therefore produce no candidates until it reconnects. The returned `hubId` links each child to its parent.
+
+## RoomStat pairing
+
+Pair the HeatHub first, then choose **Add Device → Drayton Wiser → Wiser RoomStat**. The standard device list shows one entry per physical RoomStat with both a `Device` and matching `RoomStat` record. Names use the assigned room where available, otherwise `RoomStat {id}`. Unassigned RoomStats are supported. The same numeric device ID on different hubs produces separate Homey devices.
+
+These sensors report the physical thermostat's temperature and humidity, estimated battery percentage, and signal strength. Continue using the Room device for target temperature, room mode and boosts. RoomStat pairing does not copy the hub's secret or network address. Missing readings are cleared, and devices reported offline or removed by the hub are unavailable until they return. Lock and identify controls are not included.
+
+Live checks remain outstanding: run `homey app run --remote`, pair an assigned and (where available) unassigned RoomStat, compare readings with the Wiser app, and confirm existing paired Room devices still work. Check recovery after an app restart, hub disconnection/repair and battery removal/replacement. Automated tests cover mapping against the sanitized fixture, pairing from multiple hubs, missing readings, offline/authentication recovery, parent replacement and teardown; they do not establish live pairing or hardware accuracy.
 
 ## Remote pairing tests
 

@@ -52,11 +52,11 @@ Items are grouped by area. The order within each group is not strict; pick accor
   - [ ] device lock switch
   - [ ] identify switch
   - [ ] window state
-- [ ] RoomStat driver
-  - [ ] measure_temperature
-  - [ ] measure_humidity
-  - [ ] measure_battery
-  - [ ] measure_signal
+- [x] RoomStat sensor driver — live hardware checks outstanding
+  - [x] measure_temperature
+  - [x] measure_humidity
+  - [x] measure_battery (estimated percentage)
+  - [x] measure_signal
   - [ ] device lock switch
   - [ ] identify switch
 - [ ] Heating actuator driver

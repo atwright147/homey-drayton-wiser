@@ -430,6 +430,49 @@
         }
       ],
       "id": "room"
+    },
+    {
+      "name": {
+        "en": "Wiser RoomStat"
+      },
+      "class": "sensor",
+      "energy": {
+        "batteries": [
+          "AA",
+          "AA"
+        ]
+      },
+      "capabilities": [
+        "measure_temperature",
+        "measure_humidity",
+        "measure_battery",
+        "measure_signal"
+      ],
+      "platforms": [
+        "local"
+      ],
+      "connectivity": [
+        "lan"
+      ],
+      "images": {
+        "small": "/drivers/roomstat/assets/images/small.png",
+        "large": "/drivers/roomstat/assets/images/large.png",
+        "xlarge": "/drivers/roomstat/assets/images/xlarge.png"
+      },
+      "pair": [
+        {
+          "id": "list_devices",
+          "template": "list_devices",
+          "navigation": {
+            "next": "add_devices"
+          }
+        },
+        {
+          "id": "add_devices",
+          "template": "add_devices"
+        }
+      ],
+      "id": "roomstat"
     }
   ],
   "widgets": {
@@ -483,7 +526,8 @@
       "max": 100,
       "step": 1,
       "decimals": 0,
-      "uiComponent": "sensor"
+      "uiComponent": "sensor",
+      "icon": "/assets/wifi.svg"
     },
     "wiser_away_mode": {
       "type": "boolean",

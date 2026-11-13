@@ -78,6 +78,10 @@ For discovery recovery, change the hub's IP, wait for an mDNS address change, an
 
 Note: Homey does not automatically add new capabilities to existing devices. The Hot Water driver migrates its boost capabilities in `onInit`; the Room driver does not have a capability migration, so a future Room capability addition needs a migration or re-pairing. Delete `.homeybuild` if a code change is not reflected.
 
+### RoomStat
+
+Pair a HeatHub, then add **Wiser RoomStat** from the device list. This is a separate read-only physical sensor with temperature, humidity, estimated battery percentage and signal strength. Use the Room device for heating controls. See [RoomStat pairing](./pairing.md#roomstat-pairing) for outstanding live checks. RoomStat mapping and driver regression coverage live in `test/wiser-roomstat.test.ts` and `test/drivers/roomstat.test.ts`.
+
 ## Capability Migration
 
 Device capabilities are part of the pairing data, so capabilities added later are not present on already-paired devices. `HotWaterDevice.migrateCapabilities()` runs in `onInit` and:

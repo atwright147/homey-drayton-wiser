@@ -22,17 +22,18 @@ This folder contains documentation for developers/agents working on the Homey Pr
 
 ## Current State
 
-Three drivers are implemented:
+Four drivers are implemented:
 
 - **HeatHub** — pairs via mDNS discovery or manual IP, authenticates with the hub secret, polls every 30 seconds by default, and exposes a Home/Away picker, the read-only Away target temperature, comfort/eco modes, heating activity, cloud connection, and signal strength. A verified mDNS address change updates its client and existing child devices.
 - **Room** — temperature, target temperature, humidity from a linked RoomStat, and the room mode.
+- **RoomStat** — individual physical thermostat temperature, humidity, estimated battery percentage and signal strength; read-only, using its parent HeatHub.
 - **Hot Water** — state, mode, next scheduled event, and fixed 30/60-minute boost buttons with cancel.
 
 The `wiser-schedule` dashboard widget renders the weekly hot water schedule and hides stale data when the parent hub is unavailable. Next-event labels use the Homey timezone.
 
 Flow actions: **Boost heating** (`boost_room`) and **Boost hot water** (`boost_hot_water`).
 
-iTRV and RoomStat drivers are planned.
+The iTRV driver is planned. RoomStat lock and identify controls remain future work.
 
 ## Important Notes
 
