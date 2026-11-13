@@ -114,7 +114,7 @@ Items are grouped by area. The order within each group is not strict; pick accor
 - [ ] Zigbee network connectivity card
 - [ ] Multi-hub support
 - [ ] Device identify flow
-- [ ] Repair flow to update hub secret or IP
+- [x] Repair flow to update hub secret or IP — identity verified; live repair checks outstanding
 
 ## Infrastructure
 

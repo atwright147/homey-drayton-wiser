@@ -35,6 +35,9 @@
       "template": "add_devices"
     }
   ],
+  "repair": [
+    { "id": "repair" }
+  ],
   "settings": [
     {
       "id": "comfortMode",

@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html>
+<head>
+</head>
+<body>
+  <div class="homey-container">
+    <h1 class="homey-title">Repair your Wiser HeatHub</h1>
+    <p>Select your existing hub or enter its current IP address. Leave the secret blank to keep the saved key. Your devices and Flows will be preserved.</p>
+
+    <div class="homey-form-group">
+      <label class="homey-form-label" data-i18n="pair.start.select">Discovered hubs</label>
+      <select class="homey-form-input" id="hub-select">
+        <option value="">Select a hub...</option>
+      </select>
+    </div>
+
+    <div class="homey-form-group">
+      <label class="homey-form-label" data-i18n="pair.start.ip">Hub IP address</label>
+      <input class="homey-form-input" type="text" id="ip" placeholder="192.168.0.95" />
+    </div>
+
+    <div class="homey-form-group">
+      <label class="homey-form-label" data-i18n="pair.start.secret">Secret key</label>
+      <input class="homey-form-input" type="password" id="secret" autocomplete="new-password" />
+    </div>
+
+    <button class="homey-button-primary" type="button" id="connect" >Verify and save</button>
+    <p id="status"></p>
+  </div>
+
+  <script type="application/javascript">
+    (function() {
+      const hubSelect = document.getElementById('hub-select');
+      const connectButton = document.getElementById('connect');
+      const ipInput = document.getElementById('ip');
+      const secretInput = document.getElementById('secret');
+      const statusText = document.getElementById('status');
+      let selectedDiscoveryId = null;
+
+      function loadDiscoveredHubs() {
+        Homey.emit('discover').then(function(hubs) {
+          hubSelect.innerHTML = '<option value="">Select a hub...</option>';
+          if (!hubs || hubs.length === 0) {
+            const option = document.createElement('option');
+            option.value = '';
+            option.textContent = 'No hubs discovered (enter IP manually)';
+            option.disabled = true;
+            hubSelect.appendChild(option);
+            return;
+          }
+          hubs.forEach(function(hub) {
+            const option = document.createElement('option');
+            option.value = hub.address;
+            option.textContent = hub.name + ' (' + hub.address + ')';
+            option.dataset.id = hub.id;
+            hubSelect.appendChild(option);
+          });
+        }).catch(function(err) {
+          statusText.textContent = 'Discovery failed: ' + err.message;
+        });
+      }
+
+      hubSelect.addEventListener('change', function() {
+        const address = hubSelect.value;
+        selectedDiscoveryId = hubSelect.selectedOptions[0] && hubSelect.selectedOptions[0].dataset.id || null;
+        if (address) {
+          ipInput.value = address;
+        }
+      });
+
+      ipInput.addEventListener('input', function() {
+        if (ipInput.value.trim() !== hubSelect.value) {
+          selectedDiscoveryId = null;
+        }
+      });
+
+      connectButton.addEventListener('click', function() {
+        const ip = ipInput.value.trim();
+        const secret = secretInput.value.trim();
+
+        if (!ip) {
+          statusText.textContent = 'Enter the hub IP address.';
+          return;
+        }
+
+        connectButton.classList.add('is-loading');
+        connectButton.disabled = true;
+        statusText.textContent = '';
+
+        Homey.emit('repair_connection', { ip: ip, secret: secret, discoveryId: selectedDiscoveryId }).then(function(result) {
+          connectButton.classList.remove('is-loading');
+          connectButton.disabled = false;
+          if (result) {
+            secretInput.value = '';
+            statusText.textContent = 'Connection saved. Your devices will update after the next successful poll.';
+            Homey.done();
+          } else {
+            statusText.textContent = Homey.__('pair.start.error.invalid');
+          }
+        }).catch(function(err) {
+          connectButton.classList.remove('is-loading');
+          connectButton.disabled = false;
+          statusText.textContent = Homey.__('pair.start.error.failed') + ' ' + err.message;
+        });
+      });
+
+      connectButton.disabled = true;
+      Homey.emit('repair_details').then(function(details) {
+        ipInput.value = details.address;
+        connectButton.disabled = false;
+      }).catch(function() {
+        statusText.textContent = 'Could not load the saved address. Enter it manually.';
+        connectButton.disabled = false;
+      });
+      loadDiscoveredHubs();
+    })();
+  </script>
+</body>
+</html>

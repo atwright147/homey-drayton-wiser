@@ -113,7 +113,7 @@ When running `homey app run --remote`, logs stream to the terminal. Look for:
 | `Could not load script: /js/homey.pair.js` | Custom view includes `/homey.js` | Remove the script tag |
 | `verifyConnectionWithDomain` fails | Wrong address, secret, or hub unavailable | Check the address and secret; the default deadline is 10 seconds per attempt |
 | Hub and children unavailable | First poll failed, authentication failed, or connection failed repeatedly | Check the parent Hub, secret, and network; a successful poll restores availability |
-| Hub IP changed but old address remains | No verified matching discovery result, or an address-based legacy device ID | Check mDNS visibility and ChipId; an address-based legacy device needs re-pairing |
+| Hub IP changed but old address remains | No verified matching discovery result, or an address-based legacy device ID | Check mDNS visibility and ChipId; use Repair; a legacy address-based device needs a ChipId learned from a successful poll |
 | `Invalid Capability: ...` | Device was paired before the capability was added, or a deprecated definition was removed from the manifest too early | Add migration logic; keep deprecated definitions in `.homeycompose/capabilities/`; delete and re-pair as a last resort |
 | Device unavailable after adding a capability | `onInit` threw while adding/removing a capability | Check logs for the error; make cleanup non-fatal; see Capability Migration |
 | Old code still running | `.homeybuild` stale | Delete `.homeybuild` and re-run |

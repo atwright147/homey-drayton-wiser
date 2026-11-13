@@ -30,12 +30,94 @@ class HubDevice extends Homey.Device {
   private hub: WiserHub | null = null;
   private client: WiserClient | null = null;
   private active = false;
+  private terminated = false;
   private availabilityTarget: HubUnavailableReason | 'available' | 'unknown' = 'unknown';
   private availabilityTask: Promise<void> = Promise.resolve();
   private effectiveUseHttps = false;
   private discoveryStrategy: Homey.DiscoveryStrategy | null = null;
   private readonly observedResults: Map<string, ObservedDiscoveryResult> = new Map();
   private discoveryQueue: Promise<void> = Promise.resolve();
+
+  repairConnection(data: { ip: string; secret?: string; discoveryId?: string | null }, sessionActive: () => boolean): Promise<void> {
+    const task = this.discoveryQueue.then(() => this.applyRepair(data, sessionActive));
+    this.discoveryQueue = task.catch(() => {});
+    return task;
+  }
+
+  private getExpectedChipId(): string | null {
+    const stored = this.getStoreValue('chipId') as string | undefined;
+    if (stored) return stored;
+    const id = this.getData().id as string;
+    return id && id !== this.getStoreValue('address') ? id : null;
+  }
+
+  private async applyRepair(
+    data: { ip: string; secret?: string; discoveryId?: string | null },
+    sessionActive: () => boolean,
+  ): Promise<void> {
+    const address = typeof data?.ip === 'string' ? data.ip.trim() : '';
+    const secret = (typeof data?.secret === 'string' ? data.secret.trim() : '')
+      || this.getStoreValue('secret') as string | undefined;
+    if (!address || !secret) throw new Error('Enter the hub IP address and secret key.');
+    if (this.terminated || !sessionActive()) throw new Error('Repair session has ended. Open Repair again.');
+    const expectedChipId = this.getExpectedChipId();
+    if (!expectedChipId) {
+      throw new Error('This older device has no saved hub identity. Restore its original connection first so it can learn the identity, then retry Repair.');
+    }
+    const checkDiscovery = (): void => {
+      if (!data.discoveryId) return;
+      const selected = Object.values(this.driver.getDiscoveryStrategy().getDiscoveryResults())
+        .find((result) => result.id === data.discoveryId);
+      if (!selected || selected.address !== address) {
+        throw new Error('The selected hub has moved. Select it again or enter its current IP address manually.');
+      }
+    };
+    checkDiscovery();
+    const useHttps = this.effectiveUseHttps;
+    const verifier = new WiserClient({ host: address, secret, useHttps });
+    let domain: WiserDomain | null;
+    try {
+      domain = await verifier.verifyConnectionWithDomain();
+    } catch {
+      throw new Error('Could not connect to the Wiser hub. Check the IP address and secret.');
+    } finally {
+      await verifier.dispose();
+    }
+    if (domain?.System?.BrandName !== 'WiserHeat') {
+      throw new Error('Could not connect to the Wiser hub. Check the IP address and secret.');
+    }
+    if (domain.System.ChipId == null || String(domain.System.ChipId) !== expectedChipId) {
+      throw new Error('This is a different HeatHub. Repair must connect to the originally paired hub.');
+    }
+    if (this.terminated || !sessionActive()) throw new Error('Repair session has ended. Open Repair again.');
+    if (useHttps !== this.effectiveUseHttps) throw new Error('Connection settings changed. Try Repair again.');
+    checkDiscovery();
+    const updates: Record<string, unknown> = {
+      address, secret, chipId: expectedChipId, discoveryId: data.discoveryId || null,
+    };
+    const previous = Object.fromEntries(Object.keys(updates).map((key) => [key, this.getStoreValue(key)]));
+    try {
+      for (const [key, value] of Object.entries(updates)) await this.setStoreValue(key, value);
+      if (this.terminated) throw new Error('Device has stopped.');
+    } catch {
+      for (const [key, value] of Object.entries(previous)) {
+        try {
+          if (value === undefined) await this.unsetStoreValue(key);
+          else await this.setStoreValue(key, value);
+        } catch {
+          this.error('Could not restore a hub connection setting after failed repair:', key);
+        }
+      }
+      throw new Error('Could not save the repaired connection. Try Repair again.');
+    }
+    if (this.hub) {
+      this.client = new WiserClient({ host: address, secret, useHttps: this.effectiveUseHttps });
+      this.hub.setClient(this.client);
+    } else {
+      await this.setupHub();
+      if (this.active) this.startDiscoveryMonitoring();
+    }
+  }
 
   private readonly onStrategyResult = (result: Homey.DiscoveryResultMDNSSD): void => {
     this.observeDiscoveryResult(result);
@@ -120,8 +202,8 @@ class HubDevice extends Homey.Device {
     const storedAddress = this.getStoreValue('address') as string | undefined;
     if (storedDiscoveryId === candidate.id && storedAddress === candidate.address) return;
     const secret = this.getStoreValue('secret') as string | undefined;
-    const pairedChipId = this.getData().id as string;
-    if (!secret || !pairedChipId || pairedChipId === storedAddress) return;
+    const pairedChipId = this.getExpectedChipId();
+    if (!secret || !pairedChipId) return;
 
     const useHttps = this.effectiveUseHttps;
     const verifier = new WiserClient({ host: candidate.address, secret, useHttps });
@@ -162,10 +244,11 @@ class HubDevice extends Homey.Device {
   }
 
   private async setupHub(): Promise<void> {
+    this.effectiveUseHttps = Boolean(this.getSettings().useHttps);
     const address = this.getStoreValue('address') as string | undefined;
     const secret = this.getStoreValue('secret') as string | undefined;
     if (!address || !secret) {
-      await this.setUnavailable('No hub address or secret configured. Please re-pair the device.');
+      await this.setUnavailable('No hub address or secret configured. Please repair the device.');
       this.error('Missing address or secret in store');
       return;
     }
@@ -243,6 +326,10 @@ class HubDevice extends Homey.Device {
 
   private async onPoll(domain: WiserDomain): Promise<void> {
     try {
+      if (this.hasCurrentDomain(domain) && !this.getExpectedChipId()
+        && domain.System?.BrandName === 'WiserHeat' && domain.System.ChipId) {
+        await this.setStoreValue('chipId', String(domain.System.ChipId));
+      }
       const overrideType = domain.System?.OverrideType;
       let awayMode: boolean | null = null;
       if (overrideType === 'Away') awayMode = true;
@@ -304,6 +391,7 @@ class HubDevice extends Homey.Device {
   }
 
   async onUninit(): Promise<void> {
+    this.terminated = true;
     this.active = false;
     this.stopDiscoveryMonitoring();
     if (this.hub) {
@@ -346,6 +434,7 @@ class HubDevice extends Homey.Device {
   }
 
   async onDeleted(): Promise<void> {
+    this.terminated = true;
     this.active = false;
     this.stopDiscoveryMonitoring();
     if (this.hub) {

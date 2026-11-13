@@ -15,6 +15,27 @@ interface HubDevice {
 }
 
 class HubDriver extends Homey.Driver {
+  async onRepair(session: Homey.Driver.PairSession, device: Homey.Device & {
+    repairConnection: (data: { ip: string; secret?: string; discoveryId?: string | null }, sessionActive: () => boolean) => Promise<void>;
+  }): Promise<void> {
+    let active = true;
+    session.setHandler('disconnect', async () => {
+      active = false;
+    });
+    session.setHandler('repair_details', async () => ({ address: device.getStoreValue('address') ?? '' }));
+    session.setHandler('discover', async (): Promise<DiscoveredHub[]> => (
+      Object.values(this.getDiscoveryStrategy().getDiscoveryResults() as Record<string, Homey.DiscoveryResultMDNSSD>).map((result) => ({
+        id: result.id,
+        name: result.name,
+        address: result.address,
+      }))
+    ));
+    session.setHandler('repair_connection', async (data: { ip: string; secret?: string; discoveryId?: string | null }) => {
+      await device.repairConnection(data, () => active);
+      return true;
+    });
+  }
+
   async onInit(): Promise<void> {
     this.log('HubDriver onInit v4 - custom view');
   }

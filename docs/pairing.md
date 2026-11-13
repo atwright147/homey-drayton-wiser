@@ -15,15 +15,27 @@ The pairing clients are disposed after each request. A selected service that mov
 
 The mDNS-SD strategy searches `http._tcp` for service names matching `WiserHeat.*`. A discovered pairing stores the service's result ID in `store.discoveryId`, its current IP in `store.address`, and the secret in `store.secret`. `data.id` uses `System.ChipId` when available, falling back to the address. The `discoveryId` identifies the mDNS service; the ChipId identifies the physical hub.
 
-On startup and on discovery address changes, the paired Hub device verifies a candidate address by fetching its Wiser domain and matching `BrandName` and `ChipId`. Only then does it persist the new address and replace the shared client's connection. Existing room and hot water subscriptions continue on that same hub. A paired ChipId device without a discovery ID can acquire one after a verified match, including a device originally entered by IP. A legacy device whose `data.id` is its address cannot establish a ChipId match, so it keeps the stored address.
+On startup and on discovery address changes, the paired Hub device verifies a candidate address by fetching its Wiser domain and matching `BrandName` and `ChipId`. Only then does it persist the new address and replace the shared client's connection. Existing room and hot water subscriptions continue on that same hub. A paired ChipId device without a discovery ID can acquire one after a verified match, including a device originally entered by IP. A legacy device whose `data.id` is its address learns `store.chipId` from a successful poll of its configured hub. Once learned, it can recover through discovery while retaining its original device ID and child links. Without that identity, it keeps its stored address.
 
-Manual IP entry is a fallback when discovery does not find the hub. It leaves `store.discoveryId` unset at pairing time. A manually entered hub with a ChipId may still become discovery-linked later; manual IP is not a permanent opt-out from address updates. There is no repair flow yet to edit a stored address or secret directly.
+Manual IP entry is a fallback when discovery does not find the hub. It leaves `store.discoveryId` unset at pairing time. A manually entered hub with a ChipId may still become discovery-linked later; manual IP is not a permanent opt-out from address updates. Use Repair to update the stored address or secret directly.
+
+### HeatHub repair
+
+Open Repair on the existing HeatHub device. The custom `drivers/hub/pair/repair.html` view shows the saved address and discovered hubs, without returning the saved secret to the browser. Select the original hub or enter its current IP, optionally enter a replacement secret, then choose **Verify and save**. A blank secret retains the saved key. The existing HTTPS and polling settings are preserved.
+
+Repair verifies the connection and requires a Wiser HeatHub with the originally paired ChipId before saving anything. A selected discovery result must still point to the verified address. A different physical hub is rejected; repair does not migrate children to replacement hardware. Manual repair clears the saved discovery association, allowing subsequent discovery to establish a fresh verified match.
+
+The repair operation shares the discovery queue so a delayed address-recovery request cannot overwrite the repaired connection. Failed verification or a session closed before saving leaves the current connection unchanged. A failed store update attempts to restore all previous connection fields and does not switch the running client. On success, the shared hub replaces its client, clears stale data and immediately requests a fresh poll. Existing devices, child subscriptions and Flows retain their IDs. Availability returns after a successful poll.
+
+Legacy address-based devices can be repaired once a successful poll has saved their ChipId. If the device is already offline and no identity was saved, restore its original address and credentials first so the app can learn the identity. Repair cannot safely accept an unidentified replacement endpoint.
+
+For live verification, use `homey app run --remote` and test address-only repair, secret replacement, rejection of another hub or incorrect secret, cancellation during verification, and recovery of existing room/hot water readings and controls. Automated coverage does not establish live repair behavior.
 
 ### Store and settings
 
 | Device | Pairing data and store | Settings |
 |--------|------------------------|----------|
-| HeatHub | `data.id`: ChipId or address; `store.address`, `store.secret`, optional `store.discoveryId` | `pollInterval` (seconds), `useHttps`, comfort/eco controls, and read-only diagnostics |
+| HeatHub | `data.id`: ChipId or address; `store.address`, `store.secret`, optional `store.discoveryId` and `store.chipId` | `pollInterval` (seconds), `useHttps`, comfort/eco controls, and read-only diagnostics |
 | Room | `data.id`: `room-{hubId}-{roomId}`; `store.hubId`, `store.roomId`, plus address/secret/HTTPS snapshots | `roomMode` |
 | Hot Water | `data.id`: `hotwater-{hubId}-{hotWaterId}`; `store.hubId`, `store.hotWaterId`, plus address/secret/HTTPS snapshots | `hotWaterMode` |
 

@@ -17,6 +17,7 @@ vi.mock('homey', () => ({
 
 type TestDriver = Record<string, unknown> & {
   onPair: (session: unknown) => Promise<void>;
+  onRepair: (session: unknown, device: unknown) => Promise<void>;
   onPairListDevices: () => Promise<unknown[]>;
 };
 
@@ -38,6 +39,29 @@ describe('temporary pairing client cleanup', () => {
 
   beforeEach(() => {
     vi.restoreAllMocks();
+  });
+
+  it('exposes repair details without the secret and ends writes when the session disconnects', async () => {
+    const driver = new HubDriver();
+    driver.getDiscoveryStrategy = () => ({
+      getDiscoveryResults: () => ({ service: { id: 'service-1', name: 'WiserHeat', address: '192.0.2.9' } }),
+    });
+    const repairConnection = vi.fn(async (_data: unknown, sessionActive: () => boolean) => {
+      if (!sessionActive()) throw new Error('ended');
+    });
+    const device = {
+      getStoreValue: (key: string) => ({ address: '192.0.2.1', secret: 'private-secret' })[key as 'address' | 'secret'],
+      repairConnection,
+    };
+    const { handlers, session } = makeHubPairSession();
+    await driver.onRepair(session, device);
+    await expect(handlers.get('repair_details')!()).resolves.toEqual({ address: '192.0.2.1' });
+    await expect(handlers.get('discover')!()).resolves.toEqual([{ id: 'service-1', name: 'WiserHeat', address: '192.0.2.9' }]);
+    const data = { ip: '192.0.2.9', secret: 'replacement' };
+    await expect(handlers.get('repair_connection')!(data)).resolves.toBe(true);
+    expect(repairConnection).toHaveBeenCalledWith(data, expect.any(Function));
+    await handlers.get('disconnect')!();
+    await expect(handlers.get('repair_connection')!(data)).rejects.toThrow('ended');
   });
 
   it('disposes the hub login and list clients on success and failure', async () => {
