@@ -3,6 +3,7 @@ import {
   afterEach, beforeEach, describe, expect, it, vi,
 } from 'vitest';
 import { WiserClient } from '../../lib/wiser-client';
+import { WiserHub } from '../../lib/wiser-hub';
 import WiserHubManager from '../../lib/wiser-hub-manager';
 import * as HubDeviceModule from '../../drivers/hub/device';
 import * as RoomDeviceModule from '../../drivers/room/device';
@@ -166,5 +167,65 @@ describe('shared hub device lifecycle', () => {
     await room.onDeleted();
     expect(manager.get('hub-1')).toBe(newHub);
     await replacement.onDeleted();
+  });
+
+  it('recovers room readings and controls after the initial poll fails', async () => {
+    vi.spyOn(WiserClient.prototype, 'getDomain').mockRejectedValueOnce(new Error('offline'));
+    const manager = new WiserHubManager();
+    const client = new WiserClient({ host: '192.0.2.1', secret: 'test-secret' });
+    const hub = new WiserHub({ client });
+    manager.register('hub-1', hub);
+    const room = makeDevice(RoomDevice, manager);
+
+    await expect(room.onInit()).resolves.toBeUndefined();
+    expect(room.unavailable).toHaveBeenCalledWith('Could not connect to the Wiser HeatHub.');
+    expect(room.available).not.toHaveBeenCalled();
+    expect(room.capabilityListeners.has('target_temperature')).toBe(true);
+    expect(room.capabilityListeners.has('wiser_room_mode')).toBe(true);
+
+    await hub.poll();
+    expect(room.capabilityValues).toHaveBeenCalledWith('measure_temperature', 20.5);
+    expect(room.available).toHaveBeenCalled();
+
+    const setpoint = vi.spyOn(WiserClient.prototype, 'setRoomSetpoint').mockResolvedValue(undefined);
+    const mode = vi.spyOn(WiserClient.prototype, 'setRoomMode').mockResolvedValue(undefined);
+    await room.capabilityListeners.get('target_temperature')?.(22);
+    await room.capabilityListeners.get('wiser_room_mode')?.('manual');
+    expect(setpoint).toHaveBeenCalledWith(1, 22);
+    expect(mode).toHaveBeenCalledWith(1, 'manual');
+    await room.onUninit();
+    manager.unregister('hub-1', hub);
+  });
+
+  it('recovers hot water readings and controls after the initial poll fails', async () => {
+    vi.spyOn(WiserClient.prototype, 'getDomain').mockRejectedValueOnce(new Error('offline'));
+    const manager = new WiserHubManager();
+    const client = new WiserClient({ host: '192.0.2.1', secret: 'test-secret' });
+    const hub = new WiserHub({ client });
+    manager.register('hub-1', hub);
+    const hotWater = makeDevice(HotWaterDevice, manager);
+
+    await expect(hotWater.onInit()).resolves.toBeUndefined();
+    expect(hotWater.unavailable).toHaveBeenCalledWith('Could not connect to the Wiser HeatHub.');
+    expect(hotWater.available).not.toHaveBeenCalled();
+    expect(hotWater.capabilityListeners.has('wiser_hotwater_mode')).toBe(true);
+    expect(hotWater.capabilityListeners.has('wiser_hotwater_boost_30')).toBe(true);
+    expect(hotWater.capabilityListeners.has('wiser_hotwater_boost_cancel')).toBe(true);
+
+    await hub.poll();
+    expect(hotWater.capabilityValues).toHaveBeenCalledWith('wiser_hotwater_state', false);
+    expect(hotWater.available).toHaveBeenCalled();
+
+    const mode = vi.spyOn(WiserClient.prototype, 'setHotWaterMode').mockResolvedValue(undefined);
+    const boost = vi.spyOn(WiserClient.prototype, 'setHotWaterOverride').mockResolvedValue(undefined);
+    const cancel = vi.spyOn(WiserClient.prototype, 'cancelHotWaterOverride').mockResolvedValue(undefined);
+    await hotWater.capabilityListeners.get('wiser_hotwater_mode')?.('on');
+    await hotWater.capabilityListeners.get('wiser_hotwater_boost_30')?.(undefined);
+    await hotWater.capabilityListeners.get('wiser_hotwater_boost_cancel')?.(undefined);
+    expect(mode).toHaveBeenCalledWith(1, 'on');
+    expect(boost).toHaveBeenCalledWith(1, 30);
+    expect(cancel).toHaveBeenCalledWith(1);
+    await hotWater.onUninit();
+    manager.unregister('hub-1', hub);
   });
 });

@@ -58,12 +58,6 @@ class RoomDevice extends Homey.Device {
     const roomId = this.getRoomId();
     const manager = this.getManager();
     manager.subscribe(hubId, `room:${roomId}`, (domain) => this.onPoll(domain));
-    const hub = manager.get(hubId);
-    if (!hub) {
-      await this.setUnavailable('The parent Wiser HeatHub is not available.');
-    } else {
-      await hub.poll();
-    }
 
     this.registerCapabilityListener('target_temperature', async (value: number) => {
       const currentHub = this.getManager().get(hubId);
@@ -78,6 +72,18 @@ class RoomDevice extends Homey.Device {
       await currentHub.getClient().setRoomMode(roomId, value as RoomMode);
       await currentHub.poll();
     });
+
+    const hub = manager.get(hubId);
+    if (!hub) {
+      await this.setUnavailable('The parent Wiser HeatHub is not available.');
+    } else {
+      try {
+        await hub.poll();
+      } catch (err) {
+        this.error('Initial room poll failed:', err);
+        await this.setUnavailable('Could not connect to the Wiser HeatHub.');
+      }
+    }
   }
 
   private async onPoll(domain: WiserDomain): Promise<void> {

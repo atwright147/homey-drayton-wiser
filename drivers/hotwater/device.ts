@@ -74,12 +74,6 @@ class HotWaterDevice extends Homey.Device {
     const hotWaterId = this.getHotWaterId();
     const manager = this.getManager();
     manager.subscribe(hubId, `hotwater:${hotWaterId}`, (domain) => this.onPoll(domain));
-    const hub = manager.get(hubId);
-    if (!hub) {
-      await this.setUnavailable('The parent Wiser HeatHub is not available.');
-    } else {
-      await hub.poll();
-    }
 
     this.registerCapabilityListener('wiser_hotwater_mode', async (value: string) => {
       const currentHub = this.getManager().get(hubId);
@@ -93,6 +87,18 @@ class HotWaterDevice extends Homey.Device {
     this.registerCapabilityListener(BOOST_60_CAPABILITY, async () => this.boostHotWater(60));
 
     this.registerCapabilityListener(CANCEL_BOOST_CAPABILITY, async () => this.cancelHotWaterBoost());
+
+    const hub = manager.get(hubId);
+    if (!hub) {
+      await this.setUnavailable('The parent Wiser HeatHub is not available.');
+    } else {
+      try {
+        await hub.poll();
+      } catch (err) {
+        this.error('Initial hot water poll failed:', err);
+        await this.setUnavailable('Could not connect to the Wiser HeatHub.');
+      }
+    }
   }
 
   private async boostHotWater(minutes: number): Promise<void> {
