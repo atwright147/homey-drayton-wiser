@@ -76,4 +76,44 @@ describe('WiserHubManager subscriptions', () => {
     expect(listener).toHaveBeenCalledTimes(1);
     manager.unregister('hub-1', nextHub);
   });
+
+  it('attaches health listeners registered before the parent and removes them independently', async () => {
+    const manager = new WiserHubManager();
+    const healthListener = vi.fn();
+    const domainListener = vi.fn();
+    manager.subscribeHealth('hub-1', 'room:1', healthListener);
+    manager.subscribe('hub-1', 'room:1', domainListener);
+    await Promise.resolve();
+    expect(healthListener).toHaveBeenCalledWith({ available: false, reason: 'not_ready', lastSuccessAt: null });
+
+    const hub = makeHub({ Room: [{ id: 1 }] });
+    manager.register('hub-1', hub);
+    await hub.poll();
+    expect(healthListener).toHaveBeenLastCalledWith(expect.objectContaining({ available: true }));
+    expect(domainListener).toHaveBeenCalledTimes(1);
+
+    manager.unsubscribeHealth('hub-1', 'room:1');
+    manager.unregister('hub-1', hub);
+    expect(healthListener).toHaveBeenCalledTimes(3);
+    manager.unsubscribe('hub-1', 'room:1');
+  });
+
+  it('reattaches health listeners when a parent hub is replaced', async () => {
+    const manager = new WiserHubManager();
+    const oldHub = makeHub({ Room: [{ id: 1 }] });
+    const newHub = makeHub({ Room: [{ id: 2 }] });
+    const listener = vi.fn();
+    manager.register('hub-1', oldHub);
+    manager.subscribeHealth('hub-1', 'room:1', listener);
+    await oldHub.poll();
+    expect(listener).toHaveBeenLastCalledWith(expect.objectContaining({ available: true }));
+
+    manager.register('hub-1', newHub);
+    await newHub.poll();
+
+    expect(manager.get('hub-1')).toBe(newHub);
+    expect(listener).toHaveBeenLastCalledWith(expect.objectContaining({ available: true }));
+    manager.unsubscribeHealth('hub-1', 'room:1');
+    manager.unregister('hub-1', newHub);
+  });
 });

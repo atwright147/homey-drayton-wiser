@@ -27,12 +27,18 @@ const poll = vi.fn().mockResolvedValue(undefined);
 const getClient = vi.fn();
 const subscribe = vi.fn();
 const unsubscribe = vi.fn();
+const subscribeHealth = vi.fn();
+const unsubscribeHealth = vi.fn();
 const getHub = vi.fn<() => { getClient: typeof getClient; poll: typeof poll } | undefined>(() => ({ getClient, poll }));
 const log = vi.fn();
 const error = vi.fn();
 
 const mockHomey = {
-  app: { hubManager: { get: getHub, subscribe, unsubscribe } },
+  app: {
+    hubManager: {
+      get: getHub, subscribe, unsubscribe, subscribeHealth, unsubscribeHealth,
+    },
+  },
 };
 
 type TestDevice = Record<string, unknown> & {

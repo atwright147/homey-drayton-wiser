@@ -20,10 +20,13 @@ module.exports = {
 
     const manager = homey.app.hubManager;
     const hub = manager.get(hubId);
+    if (!hub || !hub.getHealth().available) {
+      return { available: false, state: null, nextEvent: null, schedule: null };
+    }
     const domain = hub?.getDomain();
 
     if (!domain) {
-      return { state: null, nextEvent: null, schedule: null };
+      return { available: false, state: null, nextEvent: null, schedule: null };
     }
 
     const hotWater = domain.HotWater?.find((hw) => hw.id === hotWaterId);
@@ -33,6 +36,7 @@ module.exports = {
     const nextEvent = nextEventFromSchedule(schedule) ?? device.capabilitiesObj?.wiser_hotwater_next_event?.value ?? null;
 
     return {
+      available: true,
       state,
       nextEvent,
       schedule: schedule ? buildScheduleView(schedule) : null,

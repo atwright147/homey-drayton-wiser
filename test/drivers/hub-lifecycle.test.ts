@@ -4,6 +4,7 @@ import {
 } from 'vitest';
 import { WiserClient } from '../../lib/wiser-client';
 import { WiserHub } from '../../lib/wiser-hub';
+import { WiserAuthError } from '../../lib/wiser-errors';
 import WiserHubManager from '../../lib/wiser-hub-manager';
 import * as HubDeviceModule from '../../drivers/hub/device';
 import * as RoomDeviceModule from '../../drivers/room/device';
@@ -227,5 +228,189 @@ describe('shared hub device lifecycle', () => {
     expect(cancel).toHaveBeenCalledWith(1);
     await hotWater.onUninit();
     manager.unregister('hub-1', hub);
+  });
+
+  it('marks the hub and children unavailable after sustained failures and restores them on recovery', async () => {
+    const manager = new WiserHubManager();
+    const parent = makeDevice(HubDevice, manager);
+    const room = makeDevice(RoomDevice, manager);
+    const hotWater = makeDevice(HotWaterDevice, manager);
+    await parent.onInit();
+    await room.onInit();
+    await hotWater.onInit();
+    await vi.advanceTimersByTimeAsync(0);
+
+    const hub = manager.get('hub-1');
+    const getDomain = vi.spyOn(WiserClient.prototype, 'getDomain').mockRejectedValue(new Error('offline'));
+    for (let i = 0; i < 3; i++) {
+      await expect(hub?.poll()).rejects.toThrow('offline');
+    }
+
+    for (const device of [parent, room, hotWater]) {
+      expect(device.unavailable).toHaveBeenLastCalledWith('Could not connect to the Wiser HeatHub.');
+    }
+    expect(hub?.getDomain()).toBeNull();
+
+    const recoveryCounts = [parent, room, hotWater].map((device) => device.available.mock.calls.length);
+    getDomain.mockResolvedValue(domain);
+    await hub?.poll();
+    [parent, room, hotWater].forEach((device, index) => {
+      expect(device.available.mock.calls.length).toBeGreaterThan(recoveryCounts[index]);
+    });
+    expect(hub?.getHealth().available).toBe(true);
+    await room.onUninit();
+    await hotWater.onUninit();
+    await parent.onUninit();
+  });
+
+  it('reports authentication failure immediately and parent removal to children', async () => {
+    const manager = new WiserHubManager();
+    const parent = makeDevice(HubDevice, manager);
+    const room = makeDevice(RoomDevice, manager);
+    const hotWater = makeDevice(HotWaterDevice, manager);
+    await parent.onInit();
+    await room.onInit();
+    await hotWater.onInit();
+    await vi.advanceTimersByTimeAsync(0);
+
+    vi.spyOn(WiserClient.prototype, 'getDomain').mockRejectedValue(new WiserAuthError('bad secret'));
+    await expect(manager.get('hub-1')?.poll()).rejects.toThrow('bad secret');
+    for (const device of [parent, room, hotWater]) {
+      expect(device.unavailable).toHaveBeenLastCalledWith('Wiser HeatHub authentication failed. Check the secret.');
+    }
+
+    await parent.onDeleted();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(room.unavailable).toHaveBeenLastCalledWith('The parent Wiser HeatHub is not available.');
+    expect(hotWater.unavailable).toHaveBeenLastCalledWith('The parent Wiser HeatHub is not available.');
+    await room.onUninit();
+    await hotWater.onUninit();
+  });
+
+  it('does not restore a child from a poll stopped during a capability update', async () => {
+    for (const [Cls, delayedCapability] of [
+      [RoomDevice, 'measure_temperature'],
+      [HotWaterDevice, 'wiser_hotwater_state'],
+    ] as const) {
+      const manager = new WiserHubManager();
+      const client = new WiserClient({ host: '192.0.2.1', secret: 'test-secret' });
+      const hub = new WiserHub({ client });
+      manager.register('hub-1', hub);
+      const child = makeDevice(Cls, manager);
+      await child.onInit();
+      expect(child.available).toHaveBeenCalledTimes(1);
+
+      let releaseUpdate: () => void = () => {};
+      let enteredUpdate: () => void = () => {};
+      const updatePending = new Promise<void>((resolve) => {
+        releaseUpdate = resolve;
+      });
+      const updateEntered = new Promise<void>((resolve) => {
+        enteredUpdate = resolve;
+      });
+      child.capabilityValues.mockImplementation((id: string) => {
+        if (id === delayedCapability) {
+          enteredUpdate();
+          return updatePending;
+        }
+        return Promise.resolve();
+      });
+
+      const pending = hub.poll();
+      await updateEntered;
+      manager.unregister('hub-1', hub);
+      releaseUpdate();
+      await expect(pending).resolves.toBeNull();
+      expect(child.available).toHaveBeenCalledTimes(1);
+      expect(child.unavailable).toHaveBeenLastCalledWith('The parent Wiser HeatHub is not available.');
+      await child.onUninit();
+    }
+  });
+
+  it('reapplies unavailability if shutdown occurs during setAvailable', async () => {
+    const manager = new WiserHubManager();
+    const client = new WiserClient({ host: '192.0.2.1', secret: 'test-secret' });
+    const hub = new WiserHub({ client });
+    manager.register('hub-1', hub);
+    const room = makeDevice(RoomDevice, manager);
+
+    let releaseAvailable: () => void = () => {};
+    let enteredAvailable: () => void = () => {};
+    const availablePending = new Promise<void>((resolve) => {
+      releaseAvailable = resolve;
+    });
+    const availableEntered = new Promise<void>((resolve) => {
+      enteredAvailable = resolve;
+    });
+    room.available.mockImplementation(() => {
+      enteredAvailable();
+      return availablePending;
+    });
+
+    const pending = room.onInit();
+    await availableEntered;
+    manager.unregister('hub-1', hub);
+    const unavailableBeforeCompletion = room.unavailable.mock.calls.length;
+    releaseAvailable();
+    await expect(pending).resolves.toBeUndefined();
+    expect(room.unavailable.mock.calls.length).toBeGreaterThan(unavailableBeforeCompletion);
+    expect(room.unavailable).toHaveBeenLastCalledWith('The parent Wiser HeatHub is not available.');
+    await room.onUninit();
+  });
+
+  it('restores children after a delayed old-hub unavailable update and a fresh replacement poll', async () => {
+    for (const [Cls, updatedCapability] of [
+      [RoomDevice, 'wiser_room_mode'],
+      [HotWaterDevice, 'wiser_hotwater_next_event'],
+    ] as const) {
+      const manager = new WiserHubManager();
+      const oldHub = new WiserHub({ client: new WiserClient({ host: '192.0.2.1', secret: 'test-secret' }) });
+      manager.register('hub-1', oldHub);
+      const child = makeDevice(Cls, manager);
+      await child.onInit();
+      let visibleAvailable = true;
+
+      let releaseUnavailable: () => void = () => {};
+      let enteredUnavailable: () => void = () => {};
+      const unavailablePending = new Promise<void>((resolve) => {
+        releaseUnavailable = resolve;
+      });
+      const unavailableEntered = new Promise<void>((resolve) => {
+        enteredUnavailable = resolve;
+      });
+      child.unavailable.mockImplementation(async () => {
+        enteredUnavailable();
+        await unavailablePending;
+        visibleAvailable = false;
+      });
+
+      let freshDataUpdated: () => void = () => {};
+      const freshDataEntered = new Promise<void>((resolve) => {
+        freshDataUpdated = resolve;
+      });
+      child.capabilityValues.mockImplementation((id: string) => {
+        if (id === updatedCapability) freshDataUpdated();
+        return Promise.resolve();
+      });
+      child.available.mockImplementation(async () => {
+        visibleAvailable = true;
+      });
+
+      manager.unregister('hub-1', oldHub);
+      await unavailableEntered;
+      const newHub = new WiserHub({ client: new WiserClient({ host: '192.0.2.2', secret: 'test-secret' }) });
+      manager.register('hub-1', newHub);
+      const freshPoll = newHub.poll();
+      await freshDataEntered;
+      await Promise.resolve();
+      await Promise.resolve();
+      releaseUnavailable();
+      await freshPoll;
+
+      expect(visibleAvailable).toBe(true);
+      expect(child.available).toHaveBeenCalledTimes(2);
+      await child.onUninit();
+      manager.unregister('hub-1', newHub);
+    }
   });
 });

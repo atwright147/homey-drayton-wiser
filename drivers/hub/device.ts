@@ -1,6 +1,6 @@
 import Homey from 'homey';
 import { WiserClient } from '../../lib/wiser-client';
-import { WiserHub } from '../../lib/wiser-hub';
+import { WiserHub, type HubHealthStatus, type HubUnavailableReason } from '../../lib/wiser-hub';
 import WiserHubManager from '../../lib/wiser-hub-manager';
 import {
   signalPercentFromRssi,
@@ -18,6 +18,9 @@ interface HubApp extends Homey.App {
 class HubDevice extends Homey.Device {
   private hub: WiserHub | null = null;
   private client: WiserClient | null = null;
+  private active = false;
+  private availabilityTarget: HubUnavailableReason | 'available' | 'unknown' = 'unknown';
+  private availabilityTask: Promise<void> = Promise.resolve();
 
   async onInit(): Promise<void> {
     this.log('Wiser HeatHub device init:', this.getName());
@@ -57,9 +60,11 @@ class HubDevice extends Homey.Device {
     this.hub = new WiserHub({ client: this.client, intervalMs });
 
     const id = this.getData().id as string;
+    this.active = true;
     this.getManager().register(id, this.hub);
 
     this.hub.register(`hub:${id}`, (domain) => this.onPoll(domain));
+    this.hub.registerHealth(`hub:${id}`, (health) => this.onHealth(health));
     this.hub.start();
 
     this.registerCapabilityListener('wiser_away_mode', async (value: boolean) => {
@@ -79,6 +84,39 @@ class HubDevice extends Homey.Device {
       await this.client.setEcoMode(this.toBinaryModeBoolean(value));
       await this.hub?.poll();
     });
+  }
+
+  private updateAvailability(target: HubUnavailableReason | 'available'): Promise<void> {
+    if (this.availabilityTarget === target) return this.availabilityTask;
+    this.availabilityTarget = target;
+    this.availabilityTask = this.availabilityTask.then(async () => {
+      if (this.availabilityTarget !== target || !this.active) return;
+      if (target === 'available') {
+        await this.setAvailable();
+        return;
+      }
+      let message = 'Wiser HeatHub is not ready.';
+      if (target === 'authentication') message = 'Wiser HeatHub authentication failed. Check the secret.';
+      if (target === 'connection') message = 'Could not connect to the Wiser HeatHub.';
+      await this.setUnavailable(message);
+    }).catch((err) => {
+      this.error('Could not update hub availability:', err);
+      if (this.availabilityTarget === target) this.availabilityTarget = 'unknown';
+    });
+    return this.availabilityTask;
+  }
+
+  private async onHealth(health: HubHealthStatus): Promise<void> {
+    if (!this.active || health.available || !health.reason || this.hub?.getDomain()) return;
+    const currentHub = this.getManager().get(this.getData().id as string);
+    const current = currentHub?.getHealth();
+    if (current && (current.available !== health.available || current.reason !== health.reason)) return;
+    await this.updateAvailability(health.reason);
+  }
+
+  private hasCurrentDomain(domain: WiserDomain): boolean {
+    return this.active && !!this.hub && this.getManager().get(this.getData().id as string) === this.hub
+      && this.hub.getDomain() === domain;
   }
 
   private async onPoll(domain: WiserDomain): Promise<void> {
@@ -118,14 +156,25 @@ class HubDevice extends Homey.Device {
         zigbeeChannel: domain.Zigbee?.NetworkChannel != null ? String(domain.Zigbee.NetworkChannel) : '',
         openthermStatus: domain.System?.OpenThermConnectionStatus ?? '',
       }).catch(this.error);
-      await this.setAvailable();
+      if (!this.hasCurrentDomain(domain)) return;
+      await this.updateAvailability('available');
+      if (!this.hasCurrentDomain(domain)) {
+        const health = this.getManager().get(this.getData().id as string)?.getHealth()
+          ?? { available: false, reason: 'not_ready', lastSuccessAt: null };
+        await this.onHealth(health);
+        return;
+      }
     } catch (err) {
       this.error('onPoll error:', err);
     }
   }
 
   async onUninit(): Promise<void> {
-    if (this.hub) this.getManager().unregister(this.getData().id as string, this.hub);
+    this.active = false;
+    if (this.hub) {
+      this.hub.unregisterHealth(`hub:${this.getData().id as string}`);
+      this.getManager().unregister(this.getData().id as string, this.hub);
+    }
   }
 
   async onSettings({
@@ -161,7 +210,11 @@ class HubDevice extends Homey.Device {
   }
 
   async onDeleted(): Promise<void> {
-    if (this.hub) this.getManager().unregister(this.getData().id as string, this.hub);
+    this.active = false;
+    if (this.hub) {
+      this.hub.unregisterHealth(`hub:${this.getData().id as string}`);
+      this.getManager().unregister(this.getData().id as string, this.hub);
+    }
   }
 }
 

@@ -4,6 +4,7 @@ import {
 import { WiserHub } from '../lib/wiser-hub';
 import type { WiserClient } from '../lib/wiser-client';
 import type { WiserDomain } from '../lib/wiser-types';
+import { WiserAuthError, WiserConnectionError } from '../lib/wiser-errors';
 import domainFixture from './fixtures/domain.json';
 
 function makeFakeClient(getDomain?: () => Promise<WiserDomain>) {
@@ -24,6 +25,7 @@ describe('WiserHub register/unregister', () => {
     await hub.poll();
     const listener = vi.fn();
     hub.register('room:1', listener);
+    await Promise.resolve();
     expect(listener).toHaveBeenCalledTimes(1);
     expect(listener).toHaveBeenCalledWith(domainFixture);
   });
@@ -194,5 +196,126 @@ describe('WiserHub setInterval', () => {
     await vi.advanceTimersByTimeAsync(10000);
     expect((client.getDomain as ReturnType<typeof vi.fn>).mock.calls.length).toBeGreaterThan(callsAtStart);
     hub.stop();
+  });
+});
+
+describe('WiserHub connection health', () => {
+  it('reports an initial failure immediately without exposing the error text', async () => {
+    const getDomain = vi.fn().mockRejectedValue(new WiserConnectionError('secret-sensitive-detail'));
+    const hub = new WiserHub({ client: asClient(makeFakeClient(getDomain)) });
+    const listener = vi.fn();
+    hub.registerHealth('room:1', listener);
+    await Promise.resolve();
+    expect(listener).toHaveBeenCalledWith({ available: false, reason: 'not_ready', lastSuccessAt: null });
+
+    await expect(hub.poll()).rejects.toThrow('secret-sensitive-detail');
+
+    expect(hub.getHealth()).toEqual({ available: false, reason: 'connection', lastSuccessAt: null });
+    expect(hub.getDomain()).toBeNull();
+    expect(listener).toHaveBeenLastCalledWith(hub.getHealth());
+    expect(JSON.stringify(hub.getHealth())).not.toContain('secret-sensitive-detail');
+  });
+
+  it('retains the last domain for two failures, then clears it and recovers', async () => {
+    const domain = { Room: [{ id: 1 }] } as WiserDomain;
+    const getDomain = vi.fn()
+      .mockResolvedValueOnce(domain)
+      .mockRejectedValueOnce(new WiserConnectionError('offline'))
+      .mockRejectedValueOnce(new WiserConnectionError('offline'))
+      .mockRejectedValueOnce(new WiserConnectionError('offline'))
+      .mockResolvedValueOnce(domain);
+    const hub = new WiserHub({ client: asClient(makeFakeClient(getDomain)) });
+    const listener = vi.fn();
+    hub.registerHealth('room:1', listener);
+
+    await hub.poll();
+    expect(hub.getHealth()).toMatchObject({ available: true, reason: null });
+    for (let i = 0; i < 2; i++) {
+      await expect(hub.poll()).rejects.toThrow('offline');
+      expect(hub.getHealth().available).toBe(true);
+      expect(hub.getDomain()).toBe(domain);
+    }
+    await expect(hub.poll()).rejects.toThrow('offline');
+    expect(hub.getHealth()).toMatchObject({ available: false, reason: 'connection' });
+    expect(hub.getDomain()).toBeNull();
+
+    await hub.poll();
+    expect(hub.getHealth()).toMatchObject({ available: true, reason: null });
+    expect(hub.getDomain()).toBe(domain);
+    expect(listener).toHaveBeenCalledTimes(4);
+  });
+
+  it('reports authentication failure immediately after a successful poll', async () => {
+    const getDomain = vi.fn()
+      .mockResolvedValueOnce(domainFixture)
+      .mockRejectedValueOnce(new WiserAuthError('authentication failed'));
+    const hub = new WiserHub({ client: asClient(makeFakeClient(getDomain)) });
+    await hub.poll();
+
+    await expect(hub.poll()).rejects.toBeInstanceOf(WiserAuthError);
+
+    expect(hub.getHealth()).toMatchObject({ available: false, reason: 'authentication' });
+    expect(hub.getDomain()).toBeNull();
+  });
+
+  it('expires cached data after twice the poll interval', async () => {
+    vi.useFakeTimers();
+    try {
+      const getDomain = vi.fn()
+        .mockResolvedValueOnce(domainFixture)
+        .mockRejectedValueOnce(new WiserConnectionError('offline'));
+      const hub = new WiserHub({ client: asClient(makeFakeClient(getDomain)), intervalMs: 30000 });
+      await hub.poll();
+      await vi.advanceTimersByTimeAsync(60000);
+
+      await expect(hub.poll()).rejects.toThrow('offline');
+
+      expect(hub.getHealth().available).toBe(false);
+      expect(hub.getDomain()).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('isolates data and health listener errors from other subscribers', async () => {
+    const hub = new WiserHub({ client: asClient(makeFakeClient()) });
+    const dataListener = vi.fn();
+    const healthListener = vi.fn();
+    hub.register('bad-data', () => {
+      throw new Error('device callback failed');
+    });
+    hub.register('good-data', dataListener);
+    hub.registerHealth('bad-health', () => {
+      throw new Error('status callback failed');
+    });
+    hub.registerHealth('good-health', healthListener);
+
+    await expect(hub.poll()).resolves.toEqual(domainFixture);
+
+    expect(dataListener).toHaveBeenCalledWith(domainFixture);
+    expect(healthListener).toHaveBeenLastCalledWith(expect.objectContaining({ available: true }));
+    expect(hub.getHealth().available).toBe(true);
+  });
+
+  it('isolates a listener error during cached-domain delivery', async () => {
+    const hub = new WiserHub({ client: asClient(makeFakeClient()) });
+    await hub.poll();
+
+    expect(() => hub.register('bad-data', () => {
+      throw new Error('device callback failed');
+    })).not.toThrow();
+    await Promise.resolve();
+
+    expect(hub.getHealth().available).toBe(true);
+    expect(hub.getDomain()).toEqual(domainFixture);
+  });
+
+  it('clears cached data and reports not ready when stopped', async () => {
+    const hub = new WiserHub({ client: asClient(makeFakeClient()) });
+    await hub.poll();
+    hub.stop();
+
+    expect(hub.getHealth()).toMatchObject({ available: false, reason: 'not_ready' });
+    expect(hub.getDomain()).toBeNull();
   });
 });

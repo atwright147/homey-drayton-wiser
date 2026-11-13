@@ -1,5 +1,6 @@
 import Homey from 'homey';
 import WiserHubManager from '../../lib/wiser-hub-manager';
+import { WiserHub, type HubHealthStatus, type HubUnavailableReason } from '../../lib/wiser-hub';
 import {
   roomModeFromWiser,
   validTemperatureFromApi,
@@ -35,6 +36,10 @@ function roomHumidity(domain: WiserDomain, room: WiserRoom): number | null {
 }
 
 class RoomDevice extends Homey.Device {
+  private active = false;
+  private availabilityTarget: HubUnavailableReason | 'available' | 'unknown' = 'unknown';
+  private availabilityTask: Promise<void> = Promise.resolve();
+
   async onInit(): Promise<void> {
     this.log('Wiser Room device init:', this.getName());
     await this.setCapabilityValue(ROOM_MODE_CAPABILITY, 'auto').catch(this.error);
@@ -57,7 +62,9 @@ class RoomDevice extends Homey.Device {
     const hubId = this.getHubId();
     const roomId = this.getRoomId();
     const manager = this.getManager();
-    manager.subscribe(hubId, `room:${roomId}`, (domain) => this.onPoll(domain));
+    this.active = true;
+    manager.subscribe(hubId, `room:${roomId}`, (domain) => this.onPoll(domain, manager.get(hubId)));
+    manager.subscribeHealth(hubId, `room:${roomId}`, (health) => this.onHealth(health));
 
     this.registerCapabilityListener('target_temperature', async (value: number) => {
       const currentHub = this.getManager().get(hubId);
@@ -75,18 +82,51 @@ class RoomDevice extends Homey.Device {
 
     const hub = manager.get(hubId);
     if (!hub) {
-      await this.setUnavailable('The parent Wiser HeatHub is not available.');
+      await this.onHealth({ available: false, reason: 'not_ready', lastSuccessAt: null });
     } else {
       try {
         await hub.poll();
       } catch (err) {
         this.error('Initial room poll failed:', err);
-        await this.setUnavailable('Could not connect to the Wiser HeatHub.');
       }
     }
   }
 
-  private async onPoll(domain: WiserDomain): Promise<void> {
+  private updateAvailability(target: HubUnavailableReason | 'available'): Promise<void> {
+    if (this.availabilityTarget === target) return this.availabilityTask;
+    this.availabilityTarget = target;
+    this.availabilityTask = this.availabilityTask.then(async () => {
+      if (this.availabilityTarget !== target || !this.active) return;
+      if (target === 'available') {
+        await this.setAvailable();
+        return;
+      }
+      let message = 'The parent Wiser HeatHub is not available.';
+      if (target === 'authentication') message = 'Wiser HeatHub authentication failed. Check the secret.';
+      if (target === 'connection') message = 'Could not connect to the Wiser HeatHub.';
+      await this.setUnavailable(message);
+    }).catch((err) => {
+      this.error('Could not update room availability:', err);
+      if (this.availabilityTarget === target) this.availabilityTarget = 'unknown';
+    });
+    return this.availabilityTask;
+  }
+
+  private async onHealth(health: HubHealthStatus): Promise<void> {
+    if (!this.active || health.available || !health.reason) return;
+    const hub = this.getManager().get(this.getHubId());
+    if (hub?.getDomain()) return;
+    const current = hub?.getHealth();
+    if (current && (current.available !== health.available || current.reason !== health.reason)) return;
+    await this.updateAvailability(health.reason);
+  }
+
+  private hasCurrentDomain(domain: WiserDomain, sourceHub: WiserHub | undefined): boolean {
+    return this.active && !!sourceHub && this.getManager().get(this.getHubId()) === sourceHub
+      && sourceHub.getDomain() === domain;
+  }
+
+  private async onPoll(domain: WiserDomain, sourceHub: WiserHub | undefined): Promise<void> {
     const roomId = this.getRoomId();
     const room = domain.Room?.find((r) => r.id === roomId);
     if (!room) {
@@ -111,11 +151,19 @@ class RoomDevice extends Homey.Device {
     }
     await this.setCapabilityValue(ROOM_MODE_CAPABILITY, mode).catch(this.error);
     await this.setSettings({ roomMode: mode }).catch(this.error);
-    await this.setAvailable();
+    if (!this.hasCurrentDomain(domain, sourceHub)) return;
+    await this.updateAvailability('available');
+    if (!this.hasCurrentDomain(domain, sourceHub)) {
+      const health = this.getManager().get(this.getHubId())?.getHealth()
+        ?? { available: false, reason: 'not_ready', lastSuccessAt: null };
+      await this.onHealth(health);
+    }
   }
 
   private async teardown(): Promise<void> {
+    this.active = false;
     this.getManager().unsubscribe(this.getHubId(), `room:${this.getRoomId()}`);
+    this.getManager().unsubscribeHealth(this.getHubId(), `room:${this.getRoomId()}`);
   }
 
   async onUninit(): Promise<void> {
