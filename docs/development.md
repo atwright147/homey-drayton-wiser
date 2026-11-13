@@ -2,7 +2,7 @@
 
 ## Prerequisites
 
-- Node.js 24+
+- Node.js 22+ (see `package.json`)
 - `homey` CLI authenticated to the Homey Pro
 - Homey Pro on the same local network as the development machine
 
@@ -24,8 +24,8 @@ npx tsc --noEmit
 # Build the Homey app archive
 homey app build
 
-# Validate the app
-homey app validate
+# Validate for publication
+homey app validate --level publish
 
 # Run on Homey Pro (recommended for pairing tests)
 homey app run --remote
@@ -33,8 +33,6 @@ homey app run --remote
 # Run in local Docker mode (not recommended for pairing)
 homey app run
 
-# Install as production app
-homey app install
 ```
 
 ## Running the App
@@ -69,6 +67,8 @@ homey app run --remote
 7. Click Connect.
 8. Select the hub in the `list_devices` view and add it.
 
+For discovery recovery, change the hub's IP, wait for an mDNS address change, and check that the paired Hub and its existing children resume without re-pairing. Also test manual IP entry: it has no discovery ID at pairing time, but a ChipId-based device can become discovery-linked later.
+
 ### Room
 
 1. Pair the HeatHub first.
@@ -76,19 +76,19 @@ homey app run --remote
 3. Select the rooms to add from the standard `list_devices` view.
 4. If the room has a wall-mounted RoomStat, the device will also report humidity.
 
-Note: Homey does not automatically add new capabilities to existing devices. The HotWater driver migrates its own capabilities in `onInit`; the Room driver does not, so delete and re-pair a room device if you add a capability to it. Delete `.homeybuild` if the change is not reflected.
+Note: Homey does not automatically add new capabilities to existing devices. The Hot Water driver migrates its boost capabilities in `onInit`; the Room driver does not have a capability migration, so a future Room capability addition needs a migration or re-pairing. Delete `.homeybuild` if a code change is not reflected.
 
 ## Capability Migration
 
 Device capabilities are part of the pairing data, so capabilities added later are not present on already-paired devices. `HotWaterDevice.migrateCapabilities()` runs in `onInit` and:
 
-1. Removes legacy capabilities such as `onoff` and the deprecated boost controls.
-2. Adds any missing current capabilities.
+1. Removes a legacy `onoff` capability and deprecated boost controls when present.
+2. Adds missing current state, next-event, and fixed boost button capabilities.
 
 Two Homey behaviours matter when doing this:
 
 - `removeCapability(id)` throws `Invalid Capability: <id>` with `statusCode: 404` if `id` is not defined in the app manifest. Keep the deprecated capability definition in `.homeycompose/capabilities/` until all devices have migrated, even though it is not listed in `driver.compose.json`.
-- An uncaught error in `onInit` marks the device unavailable. Wrap best-effort cleanup in `try/catch` so a failed removal is logged instead of aborting initialisation.
+- An uncaught error in `onInit` marks the device unavailable. Deprecated boost removal is best-effort and logged on failure. Other migration errors still abort initialization and need investigation.
 
 When adding a capability to a driver, add it to `driver.compose.json` for new pairings and to the driver's migration list for existing devices.
 
@@ -101,7 +101,7 @@ When running `homey app run --remote`, logs stream to the terminal. Look for:
 - `discover handler called` — mDNS discovery requested
 - `Login handler called` — user clicked Connect
 - `Verify success` — connection verified
-- `[onPoll]` — hub poll received (after adding device)
+- `HotWater poll` — hot water domain update (after adding that device)
 
 ## Troubleshooting
 
@@ -111,13 +111,16 @@ When running `homey app run --remote`, logs stream to the terminal. Look for:
 | `Timeout after 10000ms` in Docker mode | Pairing session not routed to driver | Use `homey app run --remote` |
 | `onPair` never logged | Stale build or wrong pairing approach | Delete `.homeybuild`, use custom view |
 | `Could not load script: /js/homey.pair.js` | Custom view includes `/homey.js` | Remove the script tag |
-| `verifyConnection` fails | Wrong secret or short timeout | Double-check secret; use default client timeouts |
+| `verifyConnectionWithDomain` fails | Wrong address, secret, or hub unavailable | Check the address and secret; the default deadline is 10 seconds per attempt |
+| Hub and children unavailable | First poll failed, authentication failed, or connection failed repeatedly | Check the parent Hub, secret, and network; a successful poll restores availability |
+| Hub IP changed but old address remains | No verified matching discovery result, or an address-based legacy device ID | Check mDNS visibility and ChipId; an address-based legacy device needs re-pairing |
 | `Invalid Capability: ...` | Device was paired before the capability was added, or a deprecated definition was removed from the manifest too early | Add migration logic; keep deprecated definitions in `.homeycompose/capabilities/`; delete and re-pair as a last resort |
 | Device unavailable after adding a capability | `onInit` threw while adding/removing a capability | Check logs for the error; make cleanup non-fatal; see Capability Migration |
 | Old code still running | `.homeybuild` stale | Delete `.homeybuild` and re-run |
 | Widget shows "Error loading schedule" | Widget API not receiving `deviceId` | Use a path parameter (`/:deviceId`) instead of query/body parameters |
 | Widget shows "Device not found" | Looking up by pairing `data.id` instead of Homey ID | Use `device.getId()` in the widget API handler |
-| Widget only shows 3 days | Fixed widget height clips content | Make the schedule area scrollable or reduce slot sizes |
+| Widget shows unavailable | Parent hub has no healthy cached domain | Restore hub connection; the widget clears stale schedule data until a successful poll |
+| Next event says `Timezone unavailable` | Homey clock timezone could not be read | Check Homey timezone service; weekly slots can still display in the widget |
 
 ## Testing Flow Cards
 
@@ -129,7 +132,7 @@ Flow cards are exercised in `test/drivers/flow-actions.test.ts`. The Homey SDK i
 npm test
 ```
 
-This runs unit tests for `lib/` and the driver Flow-card registration.
+This runs Vitest unit and mocked Homey driver/widget tests, including client timeouts, writes, lifecycle, health, pairing, and Flow-card registration. Passing these tests does not verify a live HeatHub or remote pairing.
 
 ### Manual Flow tests
 

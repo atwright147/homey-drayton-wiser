@@ -2,7 +2,7 @@
 
 ## Current State
 
-The HeatHub driver is feature-complete for a standalone app and app-store-ready.
+The HeatHub driver pairs via mDNS or manual IP, verifies discovered address changes against its ChipId, and owns the polling hub shared by child devices. Its availability follows poll health; the dashboard widget hides stale data while the hub is unavailable.
 The Room driver is implemented and exposes temperature, target temperature, humidity, and mode for each Wiser Room.
 The HotWater driver is implemented and exposes state, mode, next event, and fixed 30/60-minute boost buttons with cancel. The `wiser-schedule` dashboard widget renders the weekly hot water schedule.
 
@@ -42,15 +42,17 @@ Implemented in `drivers/hotwater/`. See [hotwater.md](./hotwater.md) for capabil
 
 ## Technical Considerations
 
-- Each child device should register as a listener on the hub's `WiserHub` instance via `WiserHubManager` (the Room driver already does this).
+- Each child device should subscribe to domain and health updates through `WiserHubManager`, as the Room and Hot Water drivers do. Subscriptions may start before the parent Hub and survive its replacement.
 - Child devices should not create their own polling loops; they receive domain updates from the hub.
 - The `data.id` for each child device must be unique and stable (e.g., room ID, device ID, hot water ID).
-- Use `onInit` to fetch the latest domain from the hub manager and set initial capability values.
+- Register listeners in `onInit`, then use the manager's current hub and its cached domain or request a poll. If the hub is absent, reflect `not_ready` and wait for registration.
 - Use the `onPoll` listener pattern from `RoomDevice` and `HubDevice` as a reference.
+- Read the current client from `manager.get(hubId)` for writes. Stored child address/secret values are pairing snapshots and may be stale after discovery updates.
+- Give new devices the same teardown and stale-domain guards so a delayed poll cannot mark a removed or replaced device available.
 
 ## Other Improvements
 
-- **Repair flow**: allow users to update the hub secret or IP without deleting the device.
+- **Repair flow**: allow users to update the hub secret or IP without deleting the device. Discovery handles verified address changes for ChipId-based devices, but address-based legacy IDs cannot migrate automatically.
 - **Manual refresh capability**: a button or Flow action to force a poll now.
 - **Insights**: expose signal strength, heating active hours, away mode toggles.
 - **Flow cards**: triggers for heating active, away mode changes; actions for boost, away mode.
@@ -62,8 +64,9 @@ The `WiserHubManager` in `lib/wiser-hub-manager.ts` is the central point for acc
 
 ```typescript
 const manager = (this.homey.app as HubApp).hubManager;
-const hub = manager.getHub(hubId);
-const domain = hub.getDomain();
+const hub = manager.get(hubId);
+const domain = hub?.getDomain() ?? null;
+const health = hub?.getHealth();
 ```
 
-Child devices need to know their hub ID. This can be stored in `store.hubId` during pairing.
+Child devices store their parent Hub ID in `store.hubId` during pairing. Use `manager.subscribe(hubId, listenerId, onDomain)` and `manager.subscribeHealth(hubId, listenerId, onHealth)` for updates. Pair each with `unsubscribe` / `unsubscribeHealth` on teardown. The manager retains subscriptions until the parent registers and reattaches them on replacement.

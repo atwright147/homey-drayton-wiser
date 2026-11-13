@@ -1,96 +1,38 @@
 # Pairing
 
-## HeatHub Pairing Flow
+## HeatHub pairing
 
-The Hub driver uses a custom pairing view rather than the `login_credentials` system template.
+The Hub driver uses `drivers/hub/pair/start.html` as its first pairing view. The `login_credentials` system template did not invoke `onPair` in the development environment, so this app uses a custom view. Homey injects the `Homey` global; the view must not load `/homey.js`.
 
-### Why a Custom View?
+1. The view requests mDNS results with `Homey.emit('discover')` and lists discovered hubs. The user can also enter an IP address manually.
+2. The user enters the hub secret and clicks Connect. The view emits `login` with `{ ip, secret, discoveryId }`; `discoveryId` is null for manual entry.
+3. For a selected service, the driver checks that its current discovered address still equals `ip`. It then fetches the domain with a temporary `WiserClient` and requires `BrandName === 'WiserHeat'`.
+4. The `list_devices` handler fetches the domain again. It rejects a changed `ChipId`, a non-Wiser domain, or a selected service whose address moved. It returns the HeatHub candidate, and Homey adds the selected device.
 
-The `login_credentials` system template is the documented way to collect username/password. In our environment, pairing with this template resulted in a `Timeout after 10000ms` error and the driver's `onPair` method was never called. Switching to a custom view as the first step resolved the issue.
+The pairing clients are disposed after each request. A selected service that moves during pairing must be selected again. The custom view and handler live in `drivers/hub/pair/start.html` and `drivers/hub/driver.ts`; the strategy is `.homeycompose/discovery/wiser.json`.
 
-### Current Flow
+### Discovery identity and address recovery
 
-1. **Custom view loads** (`drivers/hub/pair/start.html`).
-2. View calls `Homey.emit('discover')` to get mDNS results.
-3. Dropdown shows discovered hubs with manual IP fallback.
-4. User enters the secret.
-5. View calls `Homey.emit('login', { ip, secret })`.
-6. Driver verifies the connection via `WiserClient.verifyConnectionWithDomain()`.
-7. On success, view calls `Homey.showView('list_devices')`.
-8. `list_devices` handler returns the verified hub.
-9. `add_devices` adds the device.
+The mDNS-SD strategy searches `http._tcp` for service names matching `WiserHeat.*`. A discovered pairing stores the service's result ID in `store.discoveryId`, its current IP in `store.address`, and the secret in `store.secret`. `data.id` uses `System.ChipId` when available, falling back to the address. The `discoveryId` identifies the mDNS service; the ChipId identifies the physical hub.
 
-### Pairing Code Location
+On startup and on discovery address changes, the paired Hub device verifies a candidate address by fetching its Wiser domain and matching `BrandName` and `ChipId`. Only then does it persist the new address and replace the shared client's connection. Existing room and hot water subscriptions continue on that same hub. A paired ChipId device without a discovery ID can acquire one after a verified match, including a device originally entered by IP. A legacy device whose `data.id` is its address cannot establish a ChipId match, so it keeps the stored address.
 
-- Manifest: `drivers/hub/driver.compose.json`
-- Driver logic: `drivers/hub/driver.ts`
-- View: `drivers/hub/pair/start.html`
-- Translations: `drivers/hub/locales/en.json`
+Manual IP entry is a fallback when discovery does not find the hub. It leaves `store.discoveryId` unset at pairing time. A manually entered hub with a ChipId may still become discovery-linked later; manual IP is not a permanent opt-out from address updates. There is no repair flow yet to edit a stored address or secret directly.
 
-### Pairing on `my.homey.app`
+### Store and settings
 
-- The custom view works on both the local URL (`https://192-168-x-x.homey.homeylocal.com`) and `https://my.homey.app`.
-- The browser may ask for "Look for and connect to any device on your local network". The user must **Allow** this.
-- If the permission is denied, Homey falls back to the cloud relay, which may not route the pairing session for LAN-only devices.
+| Device | Pairing data and store | Settings |
+|--------|------------------------|----------|
+| HeatHub | `data.id`: ChipId or address; `store.address`, `store.secret`, optional `store.discoveryId` | `pollInterval` (seconds), `useHttps`, comfort/eco controls, and read-only diagnostics |
+| Room | `data.id`: `room-{hubId}-{roomId}`; `store.hubId`, `store.roomId`, plus address/secret/HTTPS snapshots | `roomMode` |
+| Hot Water | `data.id`: `hotwater-{hubId}-{hotWaterId}`; `store.hubId`, `store.hotWaterId`, plus address/secret/HTTPS snapshots | `hotWaterMode` |
 
-### Development Mode
+The child store snapshots are pairing data. At runtime, child polling and writes use the parent `WiserHub` obtained through `WiserHubManager`; the children do not start fallback polling clients.
 
-- Use `homey app run --remote` for pairing tests.
-- The default `homey app run` (Docker mode) does not reliably route the pairing session to the driver.
-- The Docker mode may also cause stale `.homeybuild` artifacts; delete `.homeybuild` if the code changes are not reflected.
+## Child pairing
 
-### Known Issues
+Room and Hot Water use the standard `list_devices` / `add_devices` views. Each driver enumerates items from paired HeatHubs. Room pairing reads a cached domain or polls the managed hub. Hot Water pairing also has a temporary direct-poll fallback if the managed hub has no domain. An unavailable hub may therefore produce no candidates until it reconnects. The returned `hubId` links each child to its parent.
 
-- `login_credentials` template: `onPair` not invoked. Use custom view instead.
-- Custom view: including `<script src="/homey.js" data-origin="pair">` causes `Could not load script: /js/homey.pair.js`. Remove this tag; `Homey` is injected automatically.
-- Short client timeouts during pairing caused `verifyConnection` to fail. The pairing client now uses default timeouts (10s, 3 retries).
-- The `pair` folder must contain a `start.html` file matching the `id` in the manifest.
+## Remote pairing tests
 
-### App Store Requirement
-
-Homey will reject App Store submissions where users must enter an IP address if discovery could be used instead. The mDNS discovery strategy is mandatory for publication.
-
-## mDNS Discovery
-
-- Strategy file: `.homeycompose/discovery/wiser.json`
-- Discovers: `http._tcp` services with names matching `WiserHeat.*`
-- Driver link: `"discovery": "wiser"` in `drivers/hub/driver.compose.json`
-- Runtime API: `this.getDiscoveryStrategy().getDiscoveryResults()`
-- Result fields used: `id`, `name`, `address`
-
-## Device Store and Settings
-
-### Hub
-
-After pairing, the device stores:
-
-- `store.address` — hub IP address
-- `store.secret` — hub secret
-- `settings.pollInterval` — seconds between polls
-- `settings.useHttps` — whether to use HTTPS
-
-The `data.id` is the hub's `System.ChipId` (fallback to address).
-
-### Room
-
-After pairing, the room device stores:
-
-- `store.hubId` — parent Hub `data.id`
-- `store.roomId` — Wiser Room `id`
-- `store.address` — hub IP address (for fallback polling)
-- `store.secret` — hub secret (for fallback polling)
-- `store.useHttps` — whether to use HTTPS (for fallback polling)
-
-The `data.id` is `room-{hubId}-{roomId}`.
-
-### Hot Water
-
-After pairing, the hot water device stores:
-
-- `store.hubId` — parent Hub `data.id`
-- `store.hotWaterId` — Wiser HotWater `id`
-- `store.address` — hub IP address (for fallback polling)
-- `store.secret` — hub secret (for fallback polling)
-- `store.useHttps` — whether to use HTTPS (for fallback polling)
-
-The `data.id` is `hotwater-{hubId}-{hotWaterId}`.
+Use `homey app run --remote`; the default Docker mode does not reliably route the pairing session. Open `my.homey.app` or the Homey local URL, permit local-network access if prompted, then test both discovered selection and manual IP entry. Delete `.homeybuild` if a changed view or driver is not reflected. Automated tests use mocked Homey APIs and do not establish that a real hub pairs successfully.

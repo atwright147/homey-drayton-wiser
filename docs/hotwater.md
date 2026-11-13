@@ -15,7 +15,7 @@ The `drivers/hotwater/` driver exposes a Wiser hot water cylinder as a Homey dev
    - `data.id`: `hotwater-{hubId}-{hotWaterId}`
    - `store.hubId`: parent Hub `data.id`
    - `store.hotWaterId`: Wiser hot water `id`
-   - `store.address`, `store.secret`, `store.useHttps`: for fallback polling
+   - `store.address`, `store.secret`, `store.useHttps`: pairing snapshots; runtime polling and writes use the parent hub
 3. The user selects the device in the standard `list_devices` / `add_devices` flow.
 
 ## Capabilities
@@ -35,11 +35,11 @@ The `drivers/hotwater/` driver exposes a Wiser hot water cylinder as a Homey dev
 
 ## Polling
 
-`HotWaterDevice` registers a listener on the parent hub's `WiserHub` via `WiserHubManager`. The listener receives the merged domain on every poll and updates `wiser_hotwater_state`, `wiser_hotwater_mode`, and `wiser_hotwater_next_event`. If the parent Hub device is unavailable, the HotWater device falls back to creating its own `WiserClient`/`WiserHub`.
+`HotWaterDevice` registers domain and health listeners for its parent hub via `WiserHubManager`. The subscription can be created before the Hub device starts and attaches when it registers. The parent owns polling; the Hot Water device does not create a fallback client. Each successful poll updates `wiser_hotwater_state`, `wiser_hotwater_mode`, and `wiser_hotwater_next_event`. The device becomes unavailable when the parent has no valid domain and reports a health failure, then recovers after a successful poll. If the parent is replaced, the manager reattaches its listeners to the new hub.
 
 ## Mode Writes
 
-Writing `wiser_hotwater_mode` calls `WiserClient.setHotWaterMode(hotWaterId, mode)` and then triggers a poll so the capability values update immediately.
+Writing `wiser_hotwater_mode` or the `hotWaterMode` setting calls the current parent's `WiserClient.setHotWaterMode(hotWaterId, mode)` and then triggers a poll so the capability values update. A write is sent once; if it times out, its outcome on the hub may be unknown.
 
 ## Boost Controls
 
@@ -65,11 +65,11 @@ Homey throws `Invalid Capability` (404) when removing a capability whose definit
 
 ## Tests
 
-`test/drivers/hotwater-device.test.ts` covers capability migration, the 30- and 60-minute boosts, cancel, removal failures, and hub-unavailable errors.
+`test/drivers/hotwater-device.test.ts` covers capability migration, the 30- and 60-minute boosts, cancel, removal failures, and hub-unavailable errors. Lifecycle and health tests also cover child-first startup, parent replacement, and stale poll handling. These are mocked Homey tests, not a live heating-control check.
 
 ## Schedule
 
-The hot water's `ScheduleId` is used to look up its `WiserSchedule`. The next event is computed by `nextHotWaterEvent()` in `lib/wiser-utils.ts`, which first checks the schedule's `Next` field and then scans the weekly slots.
+The hot water's `ScheduleId` is used to look up its `WiserSchedule`. The next event is computed by `nextHotWaterEvent()` in `lib/wiser-utils.ts`, which first checks the schedule's `Next` field and then scans the weekly slots. Relative day names and the slot comparison use the Homey timezone on each poll, so local midnight and daylight saving changes are handled without using the host process timezone. If the schedule is missing, the capability reads `No schedule`; if the Homey timezone cannot be read, it reads `Timezone unavailable`.
 
 ## Widget
 

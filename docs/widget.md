@@ -48,11 +48,14 @@ The API handler:
 
 1. Finds the `hotwater` device by its Homey ID (`device.getId()`).
 2. Reads `store.hubId` and `store.hotWaterId`.
-3. Fetches the cached domain from `WiserHubManager`.
-4. Returns:
+3. Gets the parent hub from `WiserHubManager` and checks its health before using the cached domain. When the hub is missing, unhealthy, or has no domain, it returns `{ available: false, state: null, nextEvent: null, schedule: null }`.
+4. Otherwise returns:
+   - `available: true`
    - `state`: current heating state
-   - `nextEvent`: next scheduled On/Off change
-   - `schedule`: array of days with On/Off slots
+   - `nextEvent`: next scheduled On/Off change in the Homey timezone, or `Timezone unavailable` if the clock lookup fails
+   - `schedule`: an array of days with On/Off slots, or null when there is no matching schedule
+
+The handler uses the shared `formatNextHotWaterEvent()` and `formatScheduleTime()` helpers in `lib/wiser-utils.ts`. It does not start a network request. Weekly slot times are displayed as supplied by the hub; the timezone is used for the relative next-event label and fallback search.
 
 ### Important: Device ID vs Pairing Data
 
@@ -60,7 +63,7 @@ The value returned by `Homey.getDeviceIds()` is the Homey device ID (UUID), not 
 
 ### Layout
 
-The widget is fixed at 240px height. The schedule area is scrollable so all 7 days fit in the widget.
+The widget requests a 240px height with `Homey.ready({ height: 240 })`. The schedule area scrolls when its content exceeds the available height. When the parent hub is unavailable, the UI shows `Unavailable` and clears the state and schedule from the previous successful load. If the timezone lookup fails while a schedule exists, weekly slots remain visible and the next-event field says `Timezone unavailable`.
 
 ### Reloading
 

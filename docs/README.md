@@ -24,11 +24,11 @@ This folder contains documentation for developers/agents working on the Homey Pr
 
 Three drivers are implemented:
 
-- **HeatHub** — pairs via mDNS discovery or manual IP, authenticates with the hub secret, polls every 30 seconds, and exposes away mode, heating active, cloud connection, and signal strength.
+- **HeatHub** — pairs via mDNS discovery or manual IP, authenticates with the hub secret, polls every 30 seconds by default, and exposes away/comfort/eco modes, heating activity, cloud connection, and signal strength. A verified mDNS address change updates its client and existing child devices.
 - **Room** — temperature, target temperature, humidity from a linked RoomStat, and the room mode.
 - **Hot Water** — state, mode, next scheduled event, and fixed 30/60-minute boost buttons with cancel.
 
-The `wiser-schedule` dashboard widget renders the weekly hot water schedule.
+The `wiser-schedule` dashboard widget renders the weekly hot water schedule and hides stale data when the parent hub is unavailable. Next-event labels use the Homey timezone.
 
 Flow actions: **Boost heating** (`boost_room`) and **Boost hot water** (`boost_hot_water`).
 
@@ -40,4 +40,4 @@ iTRV and RoomStat drivers are planned.
 - The custom pairing view does **not** load `/homey.js`. `Homey` is injected automatically.
 - The `login_credentials` system template was abandoned because `onPair` was never invoked in our environment.
 - Homey App Store submissions that require IP entry when discovery could be used will be rejected. mDNS discovery is mandatory.
-- Capabilities added later are not present on already-paired devices. Drivers migrate them in `onInit`; see [development.md](./development.md#capability-migration).
+- Capabilities added later are not present on already-paired devices automatically. The Hot Water driver migrates its boost capabilities in `onInit`; future additions to other drivers need their own migration. See [development.md](./development.md#capability-migration).

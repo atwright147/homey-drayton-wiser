@@ -2,164 +2,65 @@
 
 ## Overview
 
-The app is a Homey Pro (local-only) integration for the Drayton Wiser HeatHub. The HeatHub exposes a local REST API (`/data/v2/domain/`, etc.) that the app polls. The app creates a HeatHub device and then child devices for rooms, iTRVs, RoomStats, and hot water.
+This Homey Pro app uses the Wiser HeatHub LAN REST API and mDNS discovery. The implemented devices are HeatHub, Room, and Hot Water. iTRV and RoomStat drivers are planned.
 
-## Layers
+The paired HeatHub owns one `WiserClient` and one polling `WiserHub`. `app.ts` creates a single `WiserHubManager`; room and hot water devices subscribe to their parent hub through that manager. Child devices can start before the hub device, and their subscriptions attach when it registers. They do not start separate polling clients.
 
-```
-Homey Driver/Device          lib/
-────────────────────────────────────────────────────────
-drivers/hub/driver.ts        lib/wiser-client.ts
-  onPair                         fetch + auth + retry
-drivers/hub/device.ts        lib/wiser-hub.ts
-  registers WiserHub             poll loop + fan-out
-  updates capabilities       lib/wiser-hub-manager.ts
-drivers/room/driver.ts       lib/wiser-types.ts
-  lists rooms from hubs        lib/wiser-utils.ts
-drivers/room/device.ts       lib/wiser-errors.ts
-  listens to hub poll
-drivers/hotwater/driver.ts   
-  lists hot water from hubs
-drivers/hotwater/device.ts
-  listens to hub poll
-  updates hot water capabilities
-```
+## Components
 
-## Key Components
+| Component | Responsibility |
+|-----------|----------------|
+| `lib/wiser-client.ts` | Authenticated HTTP requests, transport fallback, request deadlines, cancellation, and Wiser write methods |
+| `lib/wiser-hub.ts` | Polling, current domain cache, health state, and domain fan-out |
+| `lib/wiser-hub-manager.ts` | One hub per paired HeatHub ID, pending child subscriptions, replacement, and teardown |
+| `drivers/hub/` | Pairing, discovery identity, hub settings, capabilities, and diagnostics |
+| `drivers/room/` | Room pairing, temperature/humidity/mode, and setpoint writes |
+| `drivers/hotwater/` | Hot water pairing, state/mode/next event, and boost controls |
+| `widgets/wiser-schedule/` | Read-only hot water schedule dashboard widget |
 
-### `WiserClient`
+### Client and request lifecycle
 
-- Handles all HTTP/HTTPS traffic to the HeatHub.
-- Uses `undici` for fetch.
-- Adds the `SECRET` header.
-- Defaults to HTTP with HTTPS fallback on connection errors.
-- Default timeout: 10s, retries: 3.
-- Uses a self-signed HTTPS agent (`rejectUnauthorized: false`).
+`WiserClient` sends the hub secret in the `SECRET` header. It starts on HTTP unless `useHttps` is enabled. A GET connection failure can cause an HTTPS fallback; a successful fallback becomes the client's preferred protocol. HTTPS uses an agent that accepts the hub's self-signed certificate.
 
-### `WiserHub`
+Each request attempt has a 10-second default deadline covering the response body as well as the connection. GET requests make up to three attempts per protocol by default. Writes (PATCH) make one attempt and do not switch protocols: a timeout may occur after the hub has already applied a write. Replaying it could duplicate an action. Authentication failures and non-retryable REST errors do not retry. A client switch or hub shutdown aborts pending requests and disposes the old client's HTTPS agent.
 
-- Polls the hub at a configured interval.
-- Maintains a map of listeners.
-- Each listener receives the latest `WiserDomain`.
-- Prevents concurrent polls and queues a pending poll.
+Pairing creates temporary clients for verification and device listing, then disposes them. Hot water pairing may make a temporary direct poll if the managed hub has no domain; that client is also disposed.
 
-### `WiserHubManager`
+### Hub ownership and subscriptions
 
-- Singleton created in `app.ts`.
-- One `WiserHub` instance per paired hub.
-- Devices register/unregister their listener with the manager.
+The manager exposes `register`, `unregister`, `get`, `subscribe`, `unsubscribe`, `subscribeHealth`, and `unsubscribeHealth`. Child subscriptions are retained even when the hub is not registered, then attached to a newly registered or replacement hub. Replacing a hub disposes the old one. An unregister call with an expected hub does not remove a newer replacement.
 
-### `HubDevice`
+`WiserHub` prevents concurrent polls, queues a pending poll, and gives each domain listener the latest successful domain. A new listener receives the cached domain when one exists. A client change clears that cache, cancels old requests, and starts a poll with the new client while preserving subscriptions. Stale responses from a previous client or hub generation are discarded.
 
-- Creates a `WiserClient` and `WiserHub` from store settings.
-- Registers with the manager.
-- Updates custom capabilities from the domain poll:
-  - `wiser_away_mode`, `wiser_comfort_mode`, `wiser_eco_mode` — toggles
-  - `wiser_heating_active` — boolean sensor
-  - `wiser_cloud_connected` — boolean sensor
-  - `measure_signal` — percentage sensor
-- Also populates read-only diagnostic settings on each poll:
-  - `firmwareVersion`, `hardwareGeneration`, `brandName`, `serialNumber`
-  - `zigbeeModuleVersion`, `zigbeeChannel`, `openthermStatus`
-- Capability listener for `wiser_away_mode` writes back to the hub.
+Health starts as `not_ready`. Failure before the first successful poll marks the hub unavailable immediately. After success, authentication failure is immediate; connection failure marks it unavailable after three consecutive failures or when the last success is at least two poll intervals old. Unavailable health clears the cached domain. A successful poll restores availability. Hub, room, and hot water devices reflect the parent health, while the widget withholds stale schedule data. Listeners are removed on device teardown.
 
-### `RoomDevice`
+### Device settings and writes
 
-- Registers as a listener on the parent Hub's `WiserHub` via `WiserHubManager`.
-- Falls back to creating its own `WiserClient`/`WiserHub` if the parent Hub is unavailable.
-- Capabilities: `measure_temperature`, `target_temperature`, `measure_humidity`, `wiser_room_mode`.
-- Humidity is read from the linked `RoomStat` (`RoomStatId` → `domain.RoomStat[].MeasuredHumidity`).
-- Writing `target_temperature` sends a `RequestOverride` of type `Manual` with the new setpoint.
-- Writing `wiser_room_mode` sends the mapped mode back to the hub.
+The Hub device initializes its capabilities and diagnostic settings from polls. Its away, comfort, and eco capability listeners write through the active client and poll afterward. The corresponding comfort and eco settings also write to the hub. Changing `useHttps` replaces the client, while changing `pollInterval` resets the timer without creating another hub. Room and hot water mode settings use the same write and poll pattern as their capabilities. Room setpoint writes use a manual `RequestOverride`.
 
-## Capabilities
+Child writes fetch the current client through `manager.get(hubId)` at action time. They do not use the address and secret snapshots saved in their pairing store, so a verified hub address change also reaches existing children.
 
-Custom capabilities defined in `.homeycompose/capabilities/`:
+## Pairing and discovery
 
-- `wiser_away_mode` — toggle
-- `wiser_comfort_mode` — binary toggle
-- `wiser_eco_mode` — binary toggle
-- `wiser_heating_active` — sensor
-- `wiser_cloud_connected` — sensor
-- `measure_signal` — sensor (percentage)
-- `wiser_room_mode` — enum (auto / manual / off)
-- `wiser_hotwater_mode` — enum (auto / on / off)
-- `wiser_hotwater_state` — boolean sensor
-- `wiser_hotwater_next_event` — string sensor
-- `wiser_hotwater_boost_30` — button (30-minute override)
-- `wiser_hotwater_boost_60` — button (60-minute override)
-- `wiser_hotwater_boost_cancel` — button (clear override)
+The `.homeycompose/discovery/wiser.json` mDNS-SD strategy finds `http._tcp` services whose names match `WiserHeat.*`. The Hub driver links to it with `"discovery": "wiser"`.
 
-Diagnostic settings (read-only, updated each poll on the hub device):
+The custom Hub pairing view sends `{ ip, secret, discoveryId }` when a discovered service is selected. The driver checks that the selected service still has that address, verifies the Wiser domain, and rechecks the address and `System.ChipId` before listing the device. `data.id` is the hub ChipId when present; `store.discoveryId` records the selected mDNS result ID. Manual IP entry remains available and does not set a discovery ID during pairing.
 
-- `firmwareVersion`, `hardwareGeneration`, `brandName`, `serialNumber`
-- `zigbeeModuleVersion`, `zigbeeChannel`, `openthermStatus`
+After pairing, the Hub device watches discovery results and address changes. It verifies `BrandName` and `ChipId` at the candidate address before updating `store.address` and switching the shared hub client. Existing ChipId-based devices without `store.discoveryId` can acquire one after a verified discovery match. Address-based legacy IDs cannot be matched this way and keep their stored address. A manually paired device with a ChipId may also acquire a discovery ID when its hub is later found; manual entry does not lock its address.
 
-## Discovery
+Room and hot water pairing enumerate items from paired hubs. They use the managed cached domain, with an on-demand poll when needed. Hot water pairing can make a temporary direct poll if the managed hub has no domain. Pairing stores `hubId` and the Wiser room or hot water ID; these link the child to its parent at runtime.
 
-The `.homeycompose/discovery/wiser.json` strategy discovers mDNS-SD services named `http._tcp` matching `WiserHeat.*`. The driver links to it via `"discovery": "wiser"` in `driver.compose.json`.
+## Capabilities and schedules
 
-## Pairing Design
+Custom capabilities live in `.homeycompose/capabilities/`. The Hub exposes away, comfort, eco, heating-active, cloud-connected, and signal values. Room exposes current and target temperature, linked RoomStat humidity when present, and room mode. Hot Water exposes heating state, mode, next event, and fixed 30/60-minute boost and cancel buttons. The Hot Water device migrates deprecated boost capabilities on startup.
 
-### Hub Pairing
+`WiserHub` fetches schedules alongside each domain and merges nonempty results into the domain. `nextHotWaterEvent()` uses the hub's `Schedule.Next` when available, then scans weekly slots. Relative day labels and the slot comparison use the Homey timezone, including local midnight and daylight saving changes. The device gets the current timezone for each scheduled poll. If the timezone cannot be read, it displays `Timezone unavailable`; if no schedule exists, it displays `No schedule`.
 
-The Hub driver uses a custom pairing view (`drivers/hub/pair/start.html`):
+The `wiser-schedule` widget reads the parent hub cache through a `/:deviceId` API route. It looks up the selected device by Homey's `device.getId()`, checks hub health before returning data, and uses the Homey timezone for the next event. See [widget.md](./widget.md).
 
-1. Custom view loads and calls `discover` to get discovered hubs.
-2. User selects a hub or enters an IP manually.
-3. User enters the secret.
-4. View emits `login` with `{ ip, secret }`.
-5. Driver verifies the connection.
-6. On success, view shows `list_devices`.
-7. `list_devices` handler returns the verified hub.
-8. `add_devices` adds the device.
+## Homey runtime decisions
 
-### Room Pairing
-
-The Room driver uses the default system templates (`list_devices` / `add_devices`):
-
-1. `onPairListDevices` enumerates rooms from all paired Hub devices.
-2. For each Hub, it fetches the cached domain via `WiserHubManager`.
-3. Each room is returned as a candidate with a unique `data.id` and store values (`hubId`, `roomId`, `address`, `secret`, `useHttps`).
-4. The user selects the rooms to add in the standard `add_devices` view.
-
-### Hot Water Pairing
-
-The Hot Water driver uses the default system templates (`list_devices` / `add_devices`):
-
-1. `onPairListDevices` enumerates hot water cylinders from all paired Hub devices.
-2. For each Hub, it fetches the cached domain via `WiserHubManager`.
-3. Each hot water entity is returned as a candidate with a unique `data.id` and store values (`hubId`, `hotWaterId`, `address`, `secret`, `useHttps`).
-4. The user selects the hot water devices to add in the standard `add_devices` view.
-
-### HotWaterDevice
-
-- Registers as a listener on the parent Hub's `WiserHub` via `WiserHubManager`.
-- Falls back to creating its own `WiserClient`/`WiserHub` if the parent Hub is unavailable.
-- Device class: `other`.
-- Capabilities: `wiser_hotwater_state`, `wiser_hotwater_mode`, `wiser_hotwater_next_event`, `wiser_hotwater_boost_30`, `wiser_hotwater_boost_60`, `wiser_hotwater_boost_cancel`.
-- `wiser_hotwater_state` shows whether the hot water is currently heating (`WaterHeatingState` / `HotWaterRelayState`).
-- Writing `wiser_hotwater_mode` sends the mapped mode back to the hub.
-- `wiser_hotwater_next_event` shows the next scheduled On/Off change from the hot water's `ScheduleId`.
-- The boost buttons set/cancel a manual override with `setHotWaterOverride` / `cancelHotWaterOverride` and poll afterwards. Fixed 30/60-minute durations keep all three controls in the button panel.
-- `onInit` migrates existing devices: deprecated boost capabilities are removed (non-fatal) and the fixed buttons are added.
-
-## Widgets
-
-### `wiser-schedule`
-
-Dashboard widget that displays the full weekly hot water schedule and next event for a selected hot water device.
-- Settings: select a paired `hotwater` device.
-- API endpoint reads the schedule from the parent hub's cached domain.
-- UI renders each day with its On/Off time slots.
-- See `docs/widget.md` for implementation details and known gotchas.
-
-## Important Decisions
-
-- `module.exports = class` is used for `app.ts`, `driver.ts`, and `device.ts` because `export default` compiles to `exports.default` and Homey's direct `require()` class check fails.
-- `homey` is not in `dependencies`; it is provided by the Homey runtime.
-- Type definitions come from `@types/homey` (alias of `homey-apps-sdk-v3-types`).
-- `pair/start.html` must be plain HTML with inline JavaScript. It does not include `/homey.js`; the `Homey` global is injected.
-- The driver is `platforms: ["local"]` and `connectivity: ["lan"]`.
-- The `login_credentials` system template was abandoned because `onPair` was never invoked in our test environment.
-- `homey app run --remote` is required for reliable pairing tests; the default Docker mode does not route the pairing session correctly.
+- Homey-loaded `app.ts`, `driver.ts`, and `device.ts` export their class with `module.exports`; `export default` does not satisfy the runtime's direct `require()` check.
+- `homey` is supplied by the Homey runtime; `@types/homey` supplies TypeScript definitions.
+- The custom pairing view does not load `/homey.js`; Homey injects the global.
+- Pairing tests use `homey app run --remote` because the default Docker mode does not reliably route the pairing session.
