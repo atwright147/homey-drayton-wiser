@@ -37,11 +37,13 @@ function roomHumidity(domain: WiserDomain, room: WiserRoom): number | null {
 
 class RoomDevice extends Homey.Device {
   private active = false;
+  private heatingState: boolean | null = null;
   private availabilityTarget: HubUnavailableReason | 'available' | 'unknown' = 'unknown';
   private availabilityTask: Promise<void> = Promise.resolve();
 
   async onInit(): Promise<void> {
     this.log('Wiser Room device init:', this.getName());
+    if (!this.hasCapability('wiser_room_demand')) await this.addCapability('wiser_room_demand');
     await this.setCapabilityValue(ROOM_MODE_CAPABILITY, 'auto').catch(this.error);
     await this.setupRoom();
   }
@@ -138,11 +140,18 @@ class RoomDevice extends Homey.Device {
     const targetTemp = targetTemperature(room);
     const humidity = roomHumidity(domain, room);
     const mode = roomModeFromWiser(room.Mode ?? '') ?? 'auto';
+    const demand = room.PercentageDemand;
+    const demandPercent = demand != null && Number.isFinite(demand) && demand >= 0 && demand <= 100 ? demand : null;
+    let heating: boolean | null = null;
+    if (room.ControlOutputState === 'On') heating = true;
+    else if (room.ControlOutputState === 'Off') heating = false;
+    else if (demandPercent !== null) heating = demandPercent > 0;
 
     if (currentTemp !== null) {
       await this.setCapabilityValue('measure_temperature', currentTemp).catch(this.error);
     }
     await this.setCapabilityValue('target_temperature', targetTemp ?? MIN_TARGET_TEMP).catch(this.error);
+    await this.setCapabilityValue('wiser_room_demand', demandPercent).catch(this.error);
     if (humidity !== null) {
       this.log('Room humidity:', humidity);
       await this.setCapabilityValue('measure_humidity', humidity).catch(this.error);
@@ -157,6 +166,15 @@ class RoomDevice extends Homey.Device {
       const health = this.getManager().get(this.getHubId())?.getHealth()
         ?? { available: false, reason: 'not_ready', lastSuccessAt: null };
       await this.onHealth(health);
+      return;
+    }
+    if (heating !== null) {
+      const previous = this.heatingState;
+      this.heatingState = heating;
+      if (previous !== null && previous !== heating) {
+        const card = heating ? 'room_heating_started' : 'room_heating_stopped';
+        await this.homey.flow?.getDeviceTriggerCard(card).trigger(this).catch(this.error);
+      }
     }
   }
 

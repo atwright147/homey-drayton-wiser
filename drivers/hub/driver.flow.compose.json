@@ -1,0 +1,19 @@
+{
+  "triggers": [
+    {
+      "id": "home_away_changed",
+      "title": {
+        "en": "Home/Away mode changes"
+      },
+      "tokens": [
+        {
+          "name": "mode",
+          "type": "string",
+          "title": {
+            "en": "Mode"
+          }
+        }
+      ]
+    }
+  ]
+}

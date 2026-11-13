@@ -169,6 +169,12 @@ This runs Vitest unit and mocked Homey driver/widget tests, including client tim
   { "RequestOverride": { "Type": "Manual", "SetPoint": 1100, "DurationMinutes": <duration> } }
   ```
 
+### Heating visibility and cancel actions
+
+Existing paired Room devices gain `wiser_room_demand` on startup. The read-only percentage comes from `Room.PercentageDemand`; missing or invalid readings become null. The **Room starts heating** and **Room stops heating** device triggers use `ControlOutputState` when it is On/Off, otherwise a valid positive demand. An initial reading establishes the baseline and does not fire a trigger. **Home/Away mode changes** is a HeatHub device trigger with a `mode` token containing `home` or `away`; it also skips the initial reading.
+
+The **Cancel heating override** and **Cancel hot water override** device actions use the parent hub's current client, send `RequestOverride.Type = None` for the selected room or hot-water device, and poll for refreshed state. Room and hot-water device buttons and existing boost cards remain available. Live Flow firing and control writes have not yet been exercised on hardware.
+
 ### Important notes
 
 - Always use `homey app run --remote` for Flow-card tests. Docker mode does not always register the cards correctly.

@@ -80,7 +80,19 @@ describe('Room driver flow actions', () => {
     const driver = initRoomDriver();
     await (driver.onInit as () => Promise<void>)();
     expect(getActionCard).toHaveBeenCalledWith('boost_room');
-    expect(registerRunListener).toHaveBeenCalledTimes(1);
+    expect(registerRunListener).toHaveBeenCalledTimes(2);
+  });
+
+  it('cancel_room_override uses the current hub and polls', async () => {
+    const cancelRoomOverride = vi.fn();
+    getClient.mockReturnValue({ cancelRoomOverride } as unknown as WiserClient);
+    const driver = initRoomDriver();
+    await (driver.onInit as () => Promise<void>)();
+    const listener = registerRunListener.mock.calls[0][0];
+    await listener({ device: makeDevice({ roomId: 3, hubId: 'hub-1' }) });
+    expect(getActionCard).toHaveBeenCalledWith('cancel_room_override');
+    expect(cancelRoomOverride).toHaveBeenCalledWith(3);
+    expect(poll).toHaveBeenCalledOnce();
   });
 
   it('boost_room listener calls setRoomSetpointForDuration and polls', async () => {
@@ -121,7 +133,19 @@ describe('HotWater driver flow actions', () => {
     const driver = initHotWaterDriver();
     await (driver.onInit as () => Promise<void>)();
     expect(getActionCard).toHaveBeenCalledWith('boost_hot_water');
-    expect(registerRunListener).toHaveBeenCalledTimes(1);
+    expect(registerRunListener).toHaveBeenCalledTimes(2);
+  });
+
+  it('cancel_hot_water_override uses the current hub and polls', async () => {
+    const cancelHotWaterOverride = vi.fn();
+    getClient.mockReturnValue({ cancelHotWaterOverride } as unknown as WiserClient);
+    const driver = initHotWaterDriver();
+    await (driver.onInit as () => Promise<void>)();
+    const listener = registerRunListener.mock.calls[0][0];
+    await listener({ device: makeDevice({ hotWaterId: 2, hubId: 'hub-1' }) });
+    expect(getActionCard).toHaveBeenCalledWith('cancel_hot_water_override');
+    expect(cancelHotWaterOverride).toHaveBeenCalledWith(2);
+    expect(poll).toHaveBeenCalledOnce();
   });
 
   it('boost_hot_water listener calls setHotWaterOverride and polls', async () => {

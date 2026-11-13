@@ -540,3 +540,71 @@ describe('shared hub device lifecycle', () => {
     manager.unregister('hub-1', hub);
   });
 });
+
+describe('heating and Home/Away events', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.spyOn(WiserClient.prototype, 'getDomain').mockResolvedValue(domain);
+    vi.spyOn(WiserClient.prototype, 'getSchedules').mockResolvedValue([]);
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.useRealTimers();
+  });
+
+  it('migrates demand and fires room transitions after the initial healthy reading', async () => {
+    vi.mocked(WiserClient.prototype.getDomain).mockResolvedValue({
+      ...domain, Room: [{ ...domain.Room![0], PercentageDemand: 0, ControlOutputState: 'Off' }],
+    });
+    const manager = new WiserHubManager();
+    const parent = makeDevice(HubDevice, manager);
+    const room = makeDevice(RoomDevice, manager);
+    const trigger = vi.fn().mockResolvedValue(undefined);
+    room.homey = { app: { hubManager: manager }, flow: { getDeviceTriggerCard: vi.fn(() => ({ trigger })) } };
+    const caps = new Set(['measure_temperature', 'target_temperature', 'measure_humidity', 'wiser_room_mode']);
+    room.hasCapability = (id: string) => caps.has(id);
+    room.addCapability = vi.fn(async (id: string) => {
+      caps.add(id);
+    });
+    await parent.onInit();
+    await room.onInit();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(room.addCapability).toHaveBeenCalledWith('wiser_room_demand');
+    expect(room.capabilityValues).toHaveBeenCalledWith('wiser_room_demand', 0);
+    expect(trigger).not.toHaveBeenCalled();
+    vi.mocked(WiserClient.prototype.getDomain).mockResolvedValue({ ...domain, Room: [{ ...domain.Room![0], PercentageDemand: 55, ControlOutputState: 'On' }] });
+    await manager.get('hub-1')?.poll();
+    expect(room.capabilityValues).toHaveBeenCalledWith('wiser_room_demand', 55);
+    expect(room.homey.flow.getDeviceTriggerCard).toHaveBeenCalledWith('room_heating_started');
+    expect(trigger).toHaveBeenCalledOnce();
+    await manager.get('hub-1')?.poll();
+    expect(trigger).toHaveBeenCalledOnce();
+    vi.mocked(WiserClient.prototype.getDomain).mockResolvedValue({ ...domain, Room: [{ ...domain.Room![0], PercentageDemand: 0, ControlOutputState: 'Off' }] });
+    await manager.get('hub-1')?.poll();
+    expect(room.homey.flow.getDeviceTriggerCard).toHaveBeenCalledWith('room_heating_stopped');
+    expect(trigger).toHaveBeenCalledTimes(2);
+    await room.onDeleted();
+    await parent.onDeleted();
+  });
+
+  it('fires Home/Away changes with the new mode, without a startup event', async () => {
+    const manager = new WiserHubManager();
+    const parent = makeDevice(HubDevice, manager);
+    const trigger = vi.fn().mockResolvedValue(undefined);
+    parent.homey = { app: { hubManager: manager }, flow: { getDeviceTriggerCard: vi.fn(() => ({ trigger })) } };
+    await parent.onInit();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(trigger).not.toHaveBeenCalled();
+    vi.mocked(WiserClient.prototype.getDomain).mockResolvedValue({ ...domain, System: { OverrideType: 'Away' } });
+    await manager.get('hub-1')?.poll();
+    expect(parent.homey.flow.getDeviceTriggerCard).toHaveBeenCalledWith('home_away_changed');
+    expect(trigger).toHaveBeenCalledWith(parent, { mode: 'away' });
+    await manager.get('hub-1')?.poll();
+    expect(trigger).toHaveBeenCalledOnce();
+    vi.mocked(WiserClient.prototype.getDomain).mockResolvedValue({ ...domain, System: { OverrideType: 'None' } });
+    await manager.get('hub-1')?.poll();
+    expect(trigger).toHaveBeenCalledWith(parent, { mode: 'home' });
+    await parent.onDeleted();
+  });
+});

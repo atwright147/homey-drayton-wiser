@@ -19,6 +19,13 @@ interface RoomPairDevice {
 
 class RoomDriver extends Homey.Driver {
   async onInit(): Promise<void> {
+    this.homey.flow.getActionCard('cancel_room_override').registerRunListener(async (args: { device: Homey.Device }) => {
+      const hubId = args.device.getStoreValue('hubId') as string;
+      const hub = (this.homey.app as HubApp).hubManager.get(hubId);
+      if (!hub) throw new Error('Hub not available');
+      await hub.getClient().cancelRoomOverride(args.device.getStoreValue('roomId') as number);
+      await hub.poll();
+    });
     this.homey.flow.getActionCard('boost_room').registerRunListener(async (args: { device: Homey.Device; temperature: number; duration: number }) => {
       const roomId = args.device.getStoreValue('roomId') as number;
       const hubId = args.device.getStoreValue('hubId') as string;

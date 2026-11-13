@@ -20,6 +20,12 @@
           "value": 60
         }
       ]
+    },
+    {
+      "id": "cancel_hot_water_override",
+      "title": {
+        "en": "Cancel hot water override"
+      }
     }
   ]
 }

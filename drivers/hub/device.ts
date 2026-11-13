@@ -30,6 +30,7 @@ class HubDevice extends Homey.Device {
   private hub: WiserHub | null = null;
   private client: WiserClient | null = null;
   private active = false;
+  private homeAwayState: 'home' | 'away' | null = null;
   private terminated = false;
   private availabilityTarget: HubUnavailableReason | 'available' | 'unknown' = 'unknown';
   private availabilityTask: Promise<void> = Promise.resolve();
@@ -384,6 +385,14 @@ class HubDevice extends Homey.Device {
           ?? { available: false, reason: 'not_ready', lastSuccessAt: null };
         await this.onHealth(health);
         return;
+      }
+      if (homeAwayMode) {
+        const previous = this.homeAwayState;
+        this.homeAwayState = homeAwayMode;
+        if (previous && previous !== homeAwayMode) {
+          await this.homey.flow?.getDeviceTriggerCard('home_away_changed')
+            .trigger(this, { mode: homeAwayMode }).catch(this.error);
+        }
       }
     } catch (err) {
       this.error('onPoll error:', err);

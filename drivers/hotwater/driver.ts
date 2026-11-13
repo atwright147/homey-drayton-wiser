@@ -22,6 +22,13 @@ interface HotWaterPairDevice {
 
 class HotWaterDriver extends Homey.Driver {
   async onInit(): Promise<void> {
+    this.homey.flow.getActionCard('cancel_hot_water_override').registerRunListener(async (args: { device: Homey.Device }) => {
+      const hubId = args.device.getStoreValue('hubId') as string;
+      const hub = (this.homey.app as HubApp).hubManager.get(hubId);
+      if (!hub) throw new Error('Hub not available');
+      await hub.getClient().cancelHotWaterOverride(args.device.getStoreValue('hotWaterId') as number);
+      await hub.poll();
+    });
     this.homey.flow.getActionCard('boost_hot_water').registerRunListener(async (args: { device: Homey.Device; duration: number }) => {
       const hotWaterId = args.device.getStoreValue('hotWaterId') as number;
       const hubId = args.device.getStoreValue('hubId') as string;

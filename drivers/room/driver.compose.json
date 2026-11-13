@@ -7,7 +7,8 @@
     "measure_temperature",
     "target_temperature",
     "measure_humidity",
-    "wiser_room_mode"
+    "wiser_room_mode",
+    "wiser_room_demand"
   ],
   "capabilitiesOptions": {
     "target_temperature": {
@@ -27,21 +28,31 @@
       "values": [
         {
           "id": "auto",
-          "label": { "en": "Auto" }
+          "label": {
+            "en": "Auto"
+          }
         },
         {
           "id": "manual",
-          "label": { "en": "Manual" }
+          "label": {
+            "en": "Manual"
+          }
         },
         {
           "id": "off",
-          "label": { "en": "Off" }
+          "label": {
+            "en": "Off"
+          }
         }
       ]
     }
   ],
-  "platforms": ["local"],
-  "connectivity": ["lan"],
+  "platforms": [
+    "local"
+  ],
+  "connectivity": [
+    "lan"
+  ],
   "images": {
     "small": "/drivers/room/assets/images/small.png",
     "large": "/drivers/room/assets/images/large.png",
@@ -51,7 +62,9 @@
     {
       "id": "list_devices",
       "template": "list_devices",
-      "navigation": { "next": "add_devices" }
+      "navigation": {
+        "next": "add_devices"
+      }
     },
     {
       "id": "add_devices",

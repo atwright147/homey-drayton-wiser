@@ -22,12 +22,12 @@ Items are grouped by area. The order within each group is not strict; pick accor
 ## Rooms / Climate
 
 - [x] Boost heating action (target temperature + duration) — Flow action `boost_room`
-- [ ] Cancel boost / override action
+- [x] Cancel boost / override Flow action
 - [ ] Advance schedule action
 - [ ] Window detection control
-- [ ] Per-room percentage demand sensor
+- [x] Per-room percentage demand sensor
 - [ ] Long-term statistics sensors for target temp, current temp, and demand
-- [ ] Events when a room starts or stops heating
+- [x] Events when a room starts or stops heating
 - [ ] Number of iTRVs and locked-state attributes
 - [ ] Roomstat lock state
 
@@ -37,7 +37,7 @@ Items are grouped by area. The order within each group is not strict; pick accor
 - [x] Boost hot water device buttons (30 / 60 minutes) — `wiser_hotwater_boost_30`, `wiser_hotwater_boost_60`
 - [x] Cancel hot water override — device button `wiser_hotwater_boost_cancel`
 - [ ] Override hot water action
-- [ ] Cancel hot water override Flow action
+- [x] Cancel hot water override Flow action
 - [ ] Hot water operation mode sensor (Auto / Manual / Boost / Override)
 - [ ] External tank temperature sensor climate control
 
@@ -119,7 +119,7 @@ Items are grouped by area. The order within each group is not strict; pick accor
 ## Infrastructure
 
 - [x] Flow cards for boost actions
-- [ ] Flow cards for triggers and other actions
+- [x] Flow cards for room heating and Home/Away triggers and cancel-override actions; other cards remain planned
 - [ ] Insights and long-term statistics configuration
 - [ ] Allow users to configure which rooms/devices are exposed
 - [ ] Manual refresh action/Flow card

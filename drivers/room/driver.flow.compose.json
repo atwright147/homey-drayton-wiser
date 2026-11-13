@@ -6,7 +6,7 @@
         "en": "Boost heating"
       },
       "titleFormatted": {
-        "en": "Boost heating to [[temperature]] °C for [[duration]] minutes"
+        "en": "Boost heating to [[temperature]] \u00b0C for [[duration]] minutes"
       },
       "args": [
         {
@@ -31,6 +31,26 @@
           "value": 60
         }
       ]
+    },
+    {
+      "id": "cancel_room_override",
+      "title": {
+        "en": "Cancel heating override"
+      }
+    }
+  ],
+  "triggers": [
+    {
+      "id": "room_heating_started",
+      "title": {
+        "en": "Room starts heating"
+      }
+    },
+    {
+      "id": "room_heating_stopped",
+      "title": {
+        "en": "Room stops heating"
+      }
     }
   ]
 }

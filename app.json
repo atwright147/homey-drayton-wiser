@@ -58,6 +58,19 @@
         ]
       },
       {
+        "id": "cancel_hot_water_override",
+        "title": {
+          "en": "Cancel hot water override"
+        },
+        "args": [
+          {
+            "type": "device",
+            "name": "device",
+            "filter": "driver_id=hotwater"
+          }
+        ]
+      },
+      {
         "id": "boost_room",
         "title": {
           "en": "Boost heating"
@@ -91,6 +104,69 @@
             "min": 1,
             "max": 1440,
             "value": 60
+          }
+        ]
+      },
+      {
+        "id": "cancel_room_override",
+        "title": {
+          "en": "Cancel heating override"
+        },
+        "args": [
+          {
+            "type": "device",
+            "name": "device",
+            "filter": "driver_id=room"
+          }
+        ]
+      }
+    ],
+    "triggers": [
+      {
+        "id": "home_away_changed",
+        "title": {
+          "en": "Home/Away mode changes"
+        },
+        "tokens": [
+          {
+            "name": "mode",
+            "type": "string",
+            "title": {
+              "en": "Mode"
+            }
+          }
+        ],
+        "args": [
+          {
+            "type": "device",
+            "name": "device",
+            "filter": "driver_id=hub"
+          }
+        ]
+      },
+      {
+        "id": "room_heating_started",
+        "title": {
+          "en": "Room starts heating"
+        },
+        "args": [
+          {
+            "type": "device",
+            "name": "device",
+            "filter": "driver_id=room"
+          }
+        ]
+      },
+      {
+        "id": "room_heating_stopped",
+        "title": {
+          "en": "Room stops heating"
+        },
+        "args": [
+          {
+            "type": "device",
+            "name": "device",
+            "filter": "driver_id=room"
           }
         ]
       }
@@ -366,7 +442,8 @@
         "measure_temperature",
         "target_temperature",
         "measure_humidity",
-        "wiser_room_mode"
+        "wiser_room_mode",
+        "wiser_room_demand"
       ],
       "capabilitiesOptions": {
         "target_temperature": {
@@ -777,6 +854,22 @@
       "insightsTitleFalse": {
         "en": "Hot water stopped heating"
       }
+    },
+    "wiser_room_demand": {
+      "type": "number",
+      "title": {
+        "en": "Heating Demand"
+      },
+      "getable": true,
+      "setable": false,
+      "units": {
+        "en": "%"
+      },
+      "min": 0,
+      "max": 100,
+      "step": 1,
+      "decimals": 0,
+      "uiComponent": "sensor"
     },
     "wiser_room_mode": {
       "type": "enum",

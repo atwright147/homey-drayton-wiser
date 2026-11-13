@@ -54,7 +54,7 @@ Implemented in `drivers/hotwater/`. See [hotwater.md](./hotwater.md) for capabil
 - **Repair flow — implemented**: update the hub secret or IP without deleting devices or Flows, after verifying the original ChipId. Legacy address-based devices need a previously learned ChipId. Live repair checks remain outstanding; see [pairing.md](./pairing.md).
 - **Manual refresh capability**: a button or Flow action to force a poll now.
 - **Insights**: expose signal strength, heating active hours, away mode toggles.
-- **Flow cards**: triggers for heating active, away mode changes; actions for boost, away mode.
+- **Flow cards**: room heating and Home/Away change triggers plus cancel actions are implemented. Hub heating-active and other actions remain planned.
 - **Settings**: allow users to configure which rooms/devices are exposed.
 
 ## Hub Manager API
