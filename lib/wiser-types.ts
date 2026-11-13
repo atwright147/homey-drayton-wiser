@@ -29,6 +29,7 @@ export interface WiserSystem {
   AwayModeAffectsHotWater?: boolean;
   AwayModeSetPointLimit?: number;
   AwayMode?: boolean;
+  OverrideType?: string;
   BoilerSettings?: WiserBoilerSettings;
   CoolingModeDefaultSetpoint?: number;
   CoolingAwayModeSetpointLimit?: number;

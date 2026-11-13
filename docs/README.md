@@ -24,7 +24,7 @@ This folder contains documentation for developers/agents working on the Homey Pr
 
 Three drivers are implemented:
 
-- **HeatHub** — pairs via mDNS discovery or manual IP, authenticates with the hub secret, polls every 30 seconds by default, and exposes away/comfort/eco modes, heating activity, cloud connection, and signal strength. A verified mDNS address change updates its client and existing child devices.
+- **HeatHub** — pairs via mDNS discovery or manual IP, authenticates with the hub secret, polls every 30 seconds by default, and exposes a Home/Away picker, the read-only Away target temperature, comfort/eco modes, heating activity, cloud connection, and signal strength. A verified mDNS address change updates its client and existing child devices.
 - **Room** — temperature, target temperature, humidity from a linked RoomStat, and the room mode.
 - **Hot Water** — state, mode, next scheduled event, and fixed 30/60-minute boost buttons with cancel.
 

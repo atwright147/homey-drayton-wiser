@@ -4,6 +4,8 @@
   },
   "class": "other",
   "capabilities": [
+    "wiser_home_away_mode",
+    "measure_away_temperature",
     "wiser_away_mode",
     "wiser_comfort_mode",
     "wiser_eco_mode",

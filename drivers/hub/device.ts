@@ -8,6 +8,7 @@ import {
   booleanFromWiser,
   binaryModeFromBoolean,
   binaryModeToBoolean,
+  validTemperatureFromApi,
 } from '../../lib/wiser-utils';
 import type { WiserDomain } from '../../lib/wiser-types';
 
@@ -42,6 +43,7 @@ class HubDevice extends Homey.Device {
 
   async onInit(): Promise<void> {
     this.log('Wiser HeatHub device init:', this.getName());
+    await this.migrateCapabilities();
     await this.setCapabilityValue('wiser_comfort_mode', 'off').catch(this.error);
     await this.setCapabilityValue('wiser_eco_mode', 'off').catch(this.error);
     await this.setupHub();
@@ -56,6 +58,18 @@ class HubDevice extends Homey.Device {
       return binaryModeToBoolean(value);
     }
     return false;
+  }
+
+  private async migrateCapabilities(): Promise<void> {
+    for (const capability of ['wiser_home_away_mode', 'measure_away_temperature']) {
+      if (!this.hasCapability(capability)) await this.addCapability(capability);
+    }
+  }
+
+  private async setAwayMode(enabled: boolean): Promise<void> {
+    if (!this.client) throw new Error('Hub client not ready');
+    await this.client.setAwayMode(enabled);
+    await this.hub?.poll();
   }
 
   private getManager(): WiserHubManager {
@@ -173,9 +187,12 @@ class HubDevice extends Homey.Device {
     this.hub.start();
 
     this.registerCapabilityListener('wiser_away_mode', async (value: boolean) => {
-      if (!this.client) throw new Error('Hub client not ready');
-      await this.client.setAwayMode(value);
-      await this.hub?.poll();
+      await this.setAwayMode(value);
+    });
+
+    this.registerCapabilityListener('wiser_home_away_mode', async (value: string) => {
+      if (value !== 'home' && value !== 'away') throw new Error('Invalid Home/Away mode');
+      await this.setAwayMode(value === 'away');
     });
 
     this.registerCapabilityListener('wiser_comfort_mode', async (value: string | boolean) => {
@@ -226,7 +243,17 @@ class HubDevice extends Homey.Device {
 
   private async onPoll(domain: WiserDomain): Promise<void> {
     try {
-      const awayMode = booleanFromWiser(domain.System?.AwayMode);
+      const overrideType = domain.System?.OverrideType;
+      let awayMode: boolean | null = null;
+      if (overrideType === 'Away') awayMode = true;
+      else if (overrideType === 'None') awayMode = false;
+      else if (typeof domain.System?.AwayMode === 'boolean') awayMode = domain.System.AwayMode;
+      else if (overrideType == null && domain.System) awayMode = false;
+      const awayTemperature = domain.System?.AwayModeSetPointLimit;
+      const awayTarget = awayTemperature != null && Number.isFinite(awayTemperature)
+        ? validTemperatureFromApi(awayTemperature) : null;
+      let homeAwayMode: 'home' | 'away' | null = null;
+      if (awayMode != null) homeAwayMode = awayMode ? 'away' : 'home';
       const comfortMode = booleanFromWiser(domain.System?.ComfortModeEnabled);
       const ecoMode = booleanFromWiser(domain.System?.EcoModeEnabled);
       const heatingActive = (domain.HeatingChannel ?? []).some(
@@ -242,6 +269,8 @@ class HubDevice extends Homey.Device {
         signal = signalPercentFromDisplayed(controller.DisplayedSignalStrength) ?? 0;
       }
 
+      await this.setCapabilityValue('wiser_home_away_mode', homeAwayMode).catch(this.error);
+      await this.setCapabilityValue('measure_away_temperature', awayTarget).catch(this.error);
       await this.setCapabilityValue('wiser_away_mode', awayMode).catch(this.error);
       await this.setCapabilityValue('wiser_comfort_mode', binaryModeFromBoolean(comfortMode)).catch(this.error);
       await this.setCapabilityValue('wiser_eco_mode', binaryModeFromBoolean(ecoMode)).catch(this.error);

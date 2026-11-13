@@ -36,7 +36,7 @@ Health starts as `not_ready`. Failure before the first successful poll marks the
 
 ### Device settings and writes
 
-The Hub device initializes its capabilities and diagnostic settings from polls. Its away, comfort, and eco capability listeners write through the active client and poll afterward. The corresponding comfort and eco settings also write to the hub. Changing `useHttps` replaces the client, while changing `pollInterval` resets the timer without creating another hub. Room and hot water mode settings use the same write and poll pattern as their capabilities. Room setpoint writes use a manual `RequestOverride`.
+The Hub device initializes its capabilities and diagnostic settings from polls. Its Home/Away picker and legacy Away capability send a system `RequestOverride` and poll afterward; `OverrideType` supplies the displayed state, with `AwayMode` as a fallback. An omitted override on a valid System payload means Home. The read-only Away target temperature comes from `AwayModeSetPointLimit`. Comfort and eco capability listeners and settings also write through the active client and poll afterward. Changing `useHttps` replaces the client, while changing `pollInterval` resets the timer without creating another hub. Room and hot water mode settings use the same write and poll pattern as their capabilities. Room setpoint writes use a manual `RequestOverride`.
 
 Child writes fetch the current client through `manager.get(hubId)` at action time. They do not use the address and secret snapshots saved in their pairing store, so a verified hub address change also reaches existing children.
 
@@ -52,7 +52,7 @@ Room and hot water pairing enumerate items from paired hubs. They use the manage
 
 ## Capabilities and schedules
 
-Custom capabilities live in `.homeycompose/capabilities/`. The Hub exposes away, comfort, eco, heating-active, cloud-connected, and signal values. Room exposes current and target temperature, linked RoomStat humidity when present, and room mode. Hot Water exposes heating state, mode, next event, and fixed 30/60-minute boost and cancel buttons. The Hot Water device migrates deprecated boost capabilities on startup.
+Custom capabilities live in `.homeycompose/capabilities/`. The Hub exposes a Home/Away picker, read-only Away target temperature, comfort, eco, heating-active, cloud-connected, and signal values. Its former Away boolean remains hidden for existing Flows, while existing paired hubs gain the new capabilities on startup. Room exposes current and target temperature, linked RoomStat humidity when present, and room mode. Hot Water exposes heating state, mode, next event, and fixed 30/60-minute boost and cancel buttons. The Hot Water device migrates deprecated boost capabilities on startup.
 
 `WiserHub` fetches schedules alongside each domain and merges nonempty results into the domain. `nextHotWaterEvent()` uses the hub's `Schedule.Next` when available, then scans weekly slots. Relative day labels and the slot comparison use the Homey timezone, including local midnight and daylight saving changes. The device gets the current timezone for each scheduled poll. If the timezone cannot be read, it displays `Timezone unavailable`; if no schedule exists, it displays `No schedule`.
 

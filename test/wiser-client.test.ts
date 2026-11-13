@@ -195,13 +195,17 @@ describe('WiserClient writes', () => {
     expect(JSON.parse(init.body as string)).toEqual({ RequestOverride: { Type: 'None' } });
   });
 
-  it('setAwayMode PATCHes System', async () => {
+  it('setAwayMode PATCHes the System override for both modes', async () => {
     const { client, fetchFn } = makeClient();
     fetchFn.mockResolvedValue(fakeResponse({}));
     await client.setAwayMode(true);
     const [url, init] = lastCall(fetchFn);
     expect(url).toBe('http://192.168.0.95/data/v2/domain/System');
-    expect(JSON.parse(init.body as string)).toEqual({ AwayMode: true });
+    expect(JSON.parse(init.body as string)).toEqual({ RequestOverride: { Type: 2 } });
+
+    await client.setAwayMode(false);
+    const [, homeInit] = lastCall(fetchFn, 1);
+    expect(JSON.parse(homeInit.body as string)).toEqual({ RequestOverride: { Type: 0 } });
   });
 
   it('setComfortMode PATCHes System', async () => {

@@ -88,6 +88,75 @@ describe('shared hub device lifecycle', () => {
     vi.useRealTimers();
   });
 
+  it('upgrades a paired hub and tracks Home/Away and the configured Away target', async () => {
+    const getDomain = vi.spyOn(WiserClient.prototype, 'getDomain').mockResolvedValue({
+      ...domain,
+      System: { BrandName: 'WiserHeat', AwayModeSetPointLimit: 160 },
+    });
+    const manager = new WiserHubManager();
+    const parent = makeDevice(HubDevice, manager);
+    const capabilities = new Set(['wiser_away_mode', 'wiser_comfort_mode', 'wiser_eco_mode']);
+    parent.hasCapability = (id: string) => capabilities.has(id);
+    parent.addCapability = vi.fn(async (id: string) => {
+      capabilities.add(id);
+    });
+
+    await parent.onInit();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(parent.addCapability).toHaveBeenCalledWith('wiser_home_away_mode');
+    expect(parent.addCapability).toHaveBeenCalledWith('measure_away_temperature');
+    expect(parent.removeCapability).not.toHaveBeenCalled();
+    expect(parent.capabilityValues).toHaveBeenCalledWith('wiser_home_away_mode', 'home');
+    expect(parent.capabilityValues).toHaveBeenCalledWith('measure_away_temperature', 16);
+    expect(parent.capabilityValues).toHaveBeenCalledWith('wiser_away_mode', false);
+
+    parent.capabilityValues.mockClear();
+    getDomain.mockResolvedValue({
+      ...domain,
+      System: { ...domain.System, OverrideType: 'Away', AwayModeSetPointLimit: 175 },
+    });
+    await manager.get('hub-1')?.poll();
+    expect(parent.capabilityValues).toHaveBeenCalledWith('wiser_away_mode', true);
+    expect(parent.capabilityValues).toHaveBeenCalledWith('wiser_home_away_mode', 'away');
+    expect(parent.capabilityValues).toHaveBeenCalledWith('measure_away_temperature', 17.5);
+
+    parent.capabilityValues.mockClear();
+    getDomain.mockResolvedValue({ ...domain, System: { OverrideType: 'Other', AwayModeSetPointLimit: -200 } });
+    await manager.get('hub-1')?.poll();
+    expect(parent.capabilityValues).toHaveBeenCalledWith('wiser_home_away_mode', null);
+    expect(parent.capabilityValues).toHaveBeenCalledWith('measure_away_temperature', null);
+    expect(parent.capabilityValues).toHaveBeenCalledWith('wiser_away_mode', null);
+    await parent.onUninit();
+  });
+
+  it('keeps the legacy Away control and the new picker synchronized through polls', async () => {
+    const getDomain = vi.spyOn(WiserClient.prototype, 'getDomain').mockResolvedValue(domain);
+    const setAwayMode = vi.spyOn(WiserClient.prototype, 'setAwayMode').mockResolvedValue(undefined);
+    const manager = new WiserHubManager();
+    const parent = makeDevice(HubDevice, manager);
+    await parent.onInit();
+    await vi.advanceTimersByTimeAsync(0);
+
+    getDomain.mockResolvedValue({ ...domain, System: { AwayMode: true } });
+    await parent.capabilityListeners.get('wiser_home_away_mode')?.('away');
+    expect(setAwayMode).toHaveBeenLastCalledWith(true);
+    expect(parent.capabilityValues).toHaveBeenCalledWith('wiser_home_away_mode', 'away');
+    expect(parent.capabilityValues).toHaveBeenCalledWith('wiser_away_mode', true);
+
+    getDomain.mockResolvedValue({ ...domain, System: { OverrideType: 'None' } });
+    await parent.capabilityListeners.get('wiser_home_away_mode')?.('home');
+    expect(setAwayMode).toHaveBeenLastCalledWith(false);
+    expect(parent.capabilityValues).toHaveBeenCalledWith('wiser_home_away_mode', 'home');
+
+    getDomain.mockResolvedValue({ ...domain, System: { OverrideType: 'Away' } });
+    await parent.capabilityListeners.get('wiser_away_mode')?.(true);
+    expect(setAwayMode).toHaveBeenLastCalledWith(true);
+    expect(setAwayMode).toHaveBeenCalledTimes(3);
+    await expect(parent.capabilityListeners.get('wiser_home_away_mode')?.('invalid')).rejects.toThrow('Invalid Home/Away mode');
+    expect(setAwayMode).toHaveBeenCalledTimes(3);
+    await parent.onUninit();
+  });
+
   it('connects children that initialize before the parent without creating a hub', async () => {
     const manager = new WiserHubManager();
     const room = makeDevice(RoomDevice, manager);

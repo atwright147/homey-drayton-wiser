@@ -5,8 +5,8 @@
   },
   "getable": true,
   "setable": true,
-  "uiComponent": "toggle",
-  "uiQuickAction": true,
+  "uiComponent": null,
+  "uiQuickAction": false,
   "insightsTitleTrue": {
     "en": "Away mode enabled"
   },

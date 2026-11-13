@@ -1,0 +1,13 @@
+{
+  "type": "number",
+  "title": {
+    "en": "Away target temperature"
+  },
+  "getable": true,
+  "setable": false,
+  "uiComponent": "sensor",
+  "units": {
+    "en": "°C"
+  },
+  "decimals": 1
+}

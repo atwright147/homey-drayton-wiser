@@ -303,7 +303,7 @@ export class WiserClient {
     await this.request('/data/v2/domain/System', {
       method: 'PATCH',
       responseType: 'discard',
-      body: { AwayMode: enabled },
+      body: { RequestOverride: { Type: enabled ? 2 : 0 } },
     });
   }
 

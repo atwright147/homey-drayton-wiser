@@ -61,6 +61,8 @@ function makeHub(
   });
   device.getSetting = () => false;
   device.getSettings = () => ({ pollInterval: 30, useHttps: false });
+  device.hasCapability = () => true;
+  device.addCapability = vi.fn().mockResolvedValue(undefined);
   device.setCapabilityValue = vi.fn().mockResolvedValue(undefined);
   device.setSettings = vi.fn().mockResolvedValue(undefined);
   device.setAvailable = vi.fn().mockResolvedValue(undefined);

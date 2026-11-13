@@ -1,0 +1,23 @@
+{
+  "type": "enum",
+  "title": {
+    "en": "Home/Away mode"
+  },
+  "getable": true,
+  "setable": true,
+  "uiComponent": "picker",
+  "values": [
+    {
+      "id": "home",
+      "title": {
+        "en": "Home"
+      }
+    },
+    {
+      "id": "away",
+      "title": {
+        "en": "Away"
+      }
+    }
+  ]
+}

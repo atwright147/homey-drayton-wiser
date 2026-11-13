@@ -172,6 +172,8 @@
       },
       "class": "other",
       "capabilities": [
+        "wiser_home_away_mode",
+        "measure_away_temperature",
         "wiser_away_mode",
         "wiser_comfort_mode",
         "wiser_eco_mode",
@@ -449,6 +451,19 @@
     }
   },
   "capabilities": {
+    "measure_away_temperature": {
+      "type": "number",
+      "title": {
+        "en": "Away target temperature"
+      },
+      "getable": true,
+      "setable": false,
+      "uiComponent": "sensor",
+      "units": {
+        "en": "°C"
+      },
+      "decimals": 1
+    },
     "measure_signal": {
       "type": "number",
       "title": {
@@ -472,8 +487,8 @@
       },
       "getable": true,
       "setable": true,
-      "uiComponent": "toggle",
-      "uiQuickAction": true,
+      "uiComponent": null,
+      "uiQuickAction": false,
       "insightsTitleTrue": {
         "en": "Away mode enabled"
       },
@@ -558,6 +573,29 @@
       "insightsTitleFalse": {
         "en": "Heating turned off"
       }
+    },
+    "wiser_home_away_mode": {
+      "type": "enum",
+      "title": {
+        "en": "Home/Away mode"
+      },
+      "getable": true,
+      "setable": true,
+      "uiComponent": "picker",
+      "values": [
+        {
+          "id": "home",
+          "title": {
+            "en": "Home"
+          }
+        },
+        {
+          "id": "away",
+          "title": {
+            "en": "Away"
+          }
+        }
+      ]
     },
     "wiser_hotwater_boost": {
       "type": "boolean",
