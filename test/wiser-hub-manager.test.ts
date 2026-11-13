@@ -38,6 +38,8 @@ describe('WiserHubManager subscriptions', () => {
     const manager = new WiserHubManager();
     const oldHub = makeHub({ Room: [{ id: 1 }] });
     const newHub = makeHub({ Room: [{ id: 2 }] });
+    const oldDispose = vi.spyOn(oldHub, 'dispose');
+    const newDispose = vi.spyOn(newHub, 'dispose');
     const listener = vi.fn();
     manager.register('hub-1', oldHub);
     manager.subscribe('hub-1', 'room:1', listener);
@@ -46,12 +48,15 @@ describe('WiserHubManager subscriptions', () => {
 
     manager.register('hub-1', newHub);
     expect(oldHub.isRunning()).toBe(false);
+    expect(oldDispose).toHaveBeenCalledTimes(1);
     manager.unregister('hub-1', oldHub);
     expect(manager.get('hub-1')).toBe(newHub);
+    expect(newDispose).not.toHaveBeenCalled();
     await newHub.poll();
     expect(listener).toHaveBeenCalledTimes(2);
     expect(listener).toHaveBeenLastCalledWith({ Room: [{ id: 2 }] });
     manager.unregister('hub-1', newHub);
+    expect(newDispose).toHaveBeenCalledTimes(1);
   });
 
   it('keeps subscriptions across parent removal and cleans them on unsubscribe', async () => {

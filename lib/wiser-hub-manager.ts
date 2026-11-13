@@ -7,7 +7,7 @@ export default class WiserHubManager {
   register(hubDeviceId: string, hub: WiserHub): void {
     const previous = this.hubs.get(hubDeviceId);
     if (previous === hub) return;
-    previous?.stop();
+    previous?.dispose();
     this.hubs.set(hubDeviceId, hub);
     for (const [listenerId, listener] of this.subscribers.get(hubDeviceId) ?? []) {
       hub.register(listenerId, listener);
@@ -17,7 +17,7 @@ export default class WiserHubManager {
   unregister(hubDeviceId: string, expectedHub?: WiserHub): void {
     const hub = this.hubs.get(hubDeviceId);
     if (hub && (!expectedHub || hub === expectedHub)) {
-      hub.stop();
+      hub.dispose();
       this.hubs.delete(hubDeviceId);
     }
   }

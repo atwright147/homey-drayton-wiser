@@ -45,9 +45,12 @@ export class WiserHub {
 
   setClient(client: WiserClient): void {
     if (this.client === client) return;
+    const previous = this.client;
     this.client = client;
     this.latestDomain = null;
     this.generation += 1;
+    previous.abortPendingRequests?.();
+    previous.dispose?.().catch(() => {});
     if (this.polling) {
       this.pendingPoll = true;
     } else if (this.running) {
@@ -78,10 +81,16 @@ export class WiserHub {
     this.running = false;
     this.generation += 1;
     this.pendingPoll = false;
+    this.client.abortPendingRequests?.();
     if (this.timer !== null) {
       clearInterval(this.timer);
       this.timer = null;
     }
+  }
+
+  dispose(): void {
+    this.stop();
+    this.client.dispose?.().catch(() => {});
   }
 
   isRunning(): boolean {

@@ -1,5 +1,5 @@
 import {
-  describe, it, expect, vi, beforeEach,
+  describe, it, expect, vi, beforeEach, afterEach,
 } from 'vitest';
 import { WiserClient, type FetchFn } from '../lib/wiser-client';
 import { WiserAuthError, WiserRestError, WiserConnectionError } from '../lib/wiser-errors';
@@ -10,6 +10,7 @@ function fakeResponse(opts: {
   status?: number;
   json?: () => Promise<unknown>;
   text?: () => Promise<string>;
+  arrayBuffer?: () => Promise<ArrayBuffer>;
 }): unknown {
   const status = opts.status ?? 200;
   return {
@@ -17,10 +18,17 @@ function fakeResponse(opts: {
     status,
     json: opts.json ?? (async () => ({})),
     text: opts.text ?? (async () => ''),
+    arrayBuffer: opts.arrayBuffer ?? (async () => new ArrayBuffer(0)),
   };
 }
 
-function makeClient(opts: { fetchFn?: ReturnType<typeof vi.fn>; useHttps?: boolean; retries?: number; retryDelayMs?: number } = {}) {
+function makeClient(opts: {
+  fetchFn?: ReturnType<typeof vi.fn>;
+  useHttps?: boolean;
+  retries?: number;
+  retryDelayMs?: number;
+  timeoutMs?: number;
+} = {}) {
   const fetchFn = opts.fetchFn ?? vi.fn();
   const client = new WiserClient({
     host: '192.168.0.95',
@@ -29,6 +37,7 @@ function makeClient(opts: { fetchFn?: ReturnType<typeof vi.fn>; useHttps?: boole
     useHttps: opts.useHttps,
     retries: opts.retries ?? 3,
     retryDelayMs: opts.retryDelayMs ?? 0,
+    timeoutMs: opts.timeoutMs,
   });
   return { client, fetchFn };
 }
@@ -279,9 +288,149 @@ describe('WiserClient retry and fallback', () => {
     await expect(client.getDomain()).rejects.toBeInstanceOf(WiserConnectionError);
   });
 
+  it('uses HTTPS for a later write after a successful GET fallback', async () => {
+    const { client, fetchFn } = makeClient({ retries: 1 });
+    fetchFn.mockRejectedValueOnce(new TypeError('HTTP connection refused'));
+    fetchFn.mockResolvedValueOnce(fakeResponse({ json: async () => domainFixture }));
+    fetchFn.mockResolvedValueOnce(fakeResponse({}));
+
+    await client.getDomain();
+    await client.setRoomSetpoint(1, 20);
+
+    expect(fetchFn).toHaveBeenCalledTimes(3);
+    expect(lastCall(fetchFn, 0)[0]).toBe('http://192.168.0.95/data/v2/domain/');
+    expect(lastCall(fetchFn, 1)[0]).toBe('https://192.168.0.95/data/v2/domain/');
+    const [writeUrl, writeInit] = lastCall(fetchFn, 2);
+    expect(writeUrl).toBe('https://192.168.0.95/data/v2/domain/Room/1');
+    expect(writeInit.method).toBe('PATCH');
+    expect(writeInit.dispatcher).toBeDefined();
+    await client.dispose();
+  });
+
+  it('does not retry a write after a server error', async () => {
+    const { client, fetchFn } = makeClient({ retries: 3 });
+    fetchFn.mockResolvedValue(fakeResponse({ status: 500, ok: false, text: async () => 'error' }));
+
+    await expect(client.setRoomSetpoint(1, 20)).rejects.toBeInstanceOf(WiserRestError);
+
+    expect(fetchFn).toHaveBeenCalledTimes(1);
+    expect(lastCall(fetchFn)[1].method).toBe('PATCH');
+    await client.dispose();
+  });
+
   it('getOpentherm returns null on 404', async () => {
     const { client, fetchFn } = makeClient({ retries: 3, retryDelayMs: 0 });
     fetchFn.mockResolvedValue(fakeResponse({ status: 404, ok: false }));
     expect(await client.getOpentherm()).toBeNull();
+  });
+});
+
+describe('WiserClient request lifetime', () => {
+  beforeEach(() => vi.useFakeTimers());
+  afterEach(() => vi.useRealTimers());
+
+  it('aborts stalled headers at the deadline and clears the timer', async () => {
+    const { client, fetchFn } = makeClient({ useHttps: true, retries: 1, timeoutMs: 10 });
+    fetchFn.mockImplementation(() => new Promise(() => {}));
+    const pending = client.getDomain();
+    const rejection = expect(pending).rejects.toThrow('timed out after 10ms');
+    const [, init] = lastCall(fetchFn);
+    expect((init.signal as AbortSignal).aborted).toBe(false);
+
+    await vi.advanceTimersByTimeAsync(10);
+
+    await rejection;
+    expect((init.signal as AbortSignal).aborted).toBe(true);
+    expect(vi.getTimerCount()).toBe(0);
+    await client.dispose();
+  });
+
+  it('keeps the deadline active while reading a stalled response body', async () => {
+    const { client, fetchFn } = makeClient({ useHttps: true, retries: 1, timeoutMs: 10 });
+    const json = vi.fn(() => new Promise(() => {}));
+    fetchFn.mockResolvedValue(fakeResponse({ json }));
+    const pending = client.getDomain();
+    const rejection = expect(pending).rejects.toThrow('timed out after 10ms');
+    await vi.advanceTimersByTimeAsync(0);
+    expect(json).toHaveBeenCalledTimes(1);
+
+    await vi.advanceTimersByTimeAsync(10);
+
+    await rejection;
+    expect((lastCall(fetchFn)[1].signal as AbortSignal).aborted).toBe(true);
+    expect(vi.getTimerCount()).toBe(0);
+    await client.dispose();
+  });
+
+  it('aborts a timed-out attempt before starting its retry', async () => {
+    vi.useRealTimers();
+    const { client, fetchFn } = makeClient({ useHttps: true, retries: 2, timeoutMs: 10 });
+    let abortObserved = false;
+    fetchFn.mockImplementationOnce((url: string, init: { signal: AbortSignal }) => new Promise((_, reject) => {
+      expect(url.startsWith('https://')).toBe(true);
+      init.signal.addEventListener('abort', () => {
+        abortObserved = true;
+        reject(new Error('aborted'));
+      }, { once: true });
+    }));
+    fetchFn.mockImplementationOnce(async () => {
+      expect(abortObserved).toBe(true);
+      return fakeResponse({ json: async () => domainFixture });
+    });
+    const pending = client.getDomain();
+    const firstSignal = lastCall(fetchFn)[1].signal as AbortSignal;
+
+    expect(await pending).toEqual(domainFixture);
+    expect(firstSignal.aborted).toBe(true);
+    expect(abortObserved).toBe(true);
+    expect(fetchFn).toHaveBeenCalledTimes(2);
+    await client.dispose();
+  });
+
+  it('drains write responses and clears the timer on success', async () => {
+    const { client, fetchFn } = makeClient({ useHttps: true, timeoutMs: 10 });
+    const arrayBuffer = vi.fn(async () => new ArrayBuffer(0));
+    fetchFn.mockResolvedValue(fakeResponse({ arrayBuffer }));
+
+    await client.setRoomSetpoint(1, 20);
+
+    expect(arrayBuffer).toHaveBeenCalledTimes(1);
+    expect(vi.getTimerCount()).toBe(0);
+    await client.dispose();
+  });
+
+  it('does not repeat a PATCH when its response body stalls after the write', async () => {
+    const { client, fetchFn } = makeClient({ retries: 3, timeoutMs: 10 });
+    const arrayBuffer = vi.fn(() => new Promise(() => {}));
+    fetchFn.mockResolvedValue(fakeResponse({ arrayBuffer }));
+    const pending = client.setHotWaterOverride(2, 30);
+    const rejection = expect(pending).rejects.toThrow('timed out after 10ms');
+    await vi.advanceTimersByTimeAsync(0);
+    expect(arrayBuffer).toHaveBeenCalledTimes(1);
+
+    await vi.advanceTimersByTimeAsync(10);
+
+    await rejection;
+    expect(fetchFn).toHaveBeenCalledTimes(1);
+    expect(lastCall(fetchFn)[0]).toBe('http://192.168.0.95/data/v2/domain/HotWater/2');
+    expect((lastCall(fetchFn)[1].signal as AbortSignal).aborted).toBe(true);
+    expect(vi.getTimerCount()).toBe(0);
+    await client.dispose();
+  });
+
+  it('cancels active work on disposal without retrying', async () => {
+    const { client, fetchFn } = makeClient({ useHttps: true, retries: 3, timeoutMs: 100 });
+    fetchFn.mockImplementation(() => new Promise(() => {}));
+    const pending = client.getDomain();
+    const rejection = expect(pending).rejects.toThrow('cancelled');
+    const signal = lastCall(fetchFn)[1].signal as AbortSignal;
+
+    await client.dispose();
+
+    await rejection;
+    expect(signal.aborted).toBe(true);
+    expect(fetchFn).toHaveBeenCalledTimes(1);
+    expect(vi.getTimerCount()).toBe(0);
+    await expect(client.getDomain()).rejects.toThrow('cancelled');
   });
 });

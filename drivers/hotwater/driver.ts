@@ -104,14 +104,16 @@ class HotWaterDriver extends Homey.Driver {
       return null;
     }
 
+    this.log('HotWater pair: direct polling hub', hubId, 'at', address);
+    const client = new WiserClient({ host: address, secret, useHttps });
     try {
-      this.log('HotWater pair: direct polling hub', hubId, 'at', address);
-      const client = new WiserClient({ host: address, secret, useHttps });
       const tempHub = new WiserHub({ client });
       return await tempHub.poll();
     } catch (err) {
       this.error('HotWater pair: direct poll failed for hub', hubId, err);
       return null;
+    } finally {
+      await client.dispose();
     }
   }
 }

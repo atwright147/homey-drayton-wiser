@@ -150,7 +150,11 @@ describe('WiserHub polling', () => {
     const oldDomainPromise = new Promise<WiserDomain>((resolve) => {
       resolveOld = resolve;
     });
-    const oldClient = makeFakeClient(() => oldDomainPromise);
+    const oldClient = {
+      ...makeFakeClient(() => oldDomainPromise),
+      abortPendingRequests: vi.fn(),
+      dispose: vi.fn(async () => {}),
+    };
     const newDomain = { Room: [{ id: 9 }] } as WiserDomain;
     const newClient = makeFakeClient(async () => newDomain);
     const hub = new WiserHub({ client: asClient(oldClient) });
@@ -165,6 +169,8 @@ describe('WiserHub polling', () => {
     await vi.advanceTimersByTimeAsync(0);
     expect(hub.getClient()).toBe(newClient);
     expect(hub.getDomain()).toBe(newDomain);
+    expect(oldClient.abortPendingRequests).toHaveBeenCalledTimes(1);
+    expect(oldClient.dispose).toHaveBeenCalledTimes(1);
     expect(listener).toHaveBeenCalledTimes(1);
     expect(listener).toHaveBeenCalledWith(newDomain);
   });

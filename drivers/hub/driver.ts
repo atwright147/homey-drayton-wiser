@@ -51,14 +51,18 @@ class HubDriver extends Homey.Driver {
         secret,
       });
 
-      this.log('Verifying connection to', address);
-      const domain = await client.verifyConnectionWithDomain();
-      if (domain === null) {
-        this.log('Verify failed: could not fetch domain or unexpected BrandName');
-        throw new Error('Could not connect to the Wiser hub. Check the IP address and secret.');
+      try {
+        this.log('Verifying connection to', address);
+        const domain = await client.verifyConnectionWithDomain();
+        if (domain === null) {
+          this.log('Verify failed: could not fetch domain or unexpected BrandName');
+          throw new Error('Could not connect to the Wiser hub. Check the IP address and secret.');
+        }
+        this.log('Verify success');
+        return true;
+      } finally {
+        await client.dispose();
       }
-      this.log('Verify success');
-      return true;
     });
 
     session.setHandler('list_devices', async (): Promise<HubDevice[]> => {
@@ -67,16 +71,20 @@ class HubDriver extends Homey.Driver {
         host: address,
         secret,
       });
-      const domain = await client.getDomain();
-      const id = domain.System?.ChipId ?? address;
-      return [
-        {
-          name: `Wiser HeatHub (${address})`,
-          data: { id: String(id) },
-          store: { address, secret },
-          settings: { pollInterval: 30, useHttps: false },
-        },
-      ];
+      try {
+        const domain = await client.getDomain();
+        const id = domain.System?.ChipId ?? address;
+        return [
+          {
+            name: `Wiser HeatHub (${address})`,
+            data: { id: String(id) },
+            store: { address, secret },
+            settings: { pollInterval: 30, useHttps: false },
+          },
+        ];
+      } finally {
+        await client.dispose();
+      }
     });
   }
 }
