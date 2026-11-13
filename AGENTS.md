@@ -101,3 +101,23 @@ See `docs/` for detailed documentation:
 - `homey app validate` passes at `publish` level
 - `.homeybuild` is clean if pairing was tested
 - No secrets in logs or committed files
+
+## Project Agents
+
+Project-scoped Codex agent definitions live in `.codex/agents/`. All roles follow this file; their definitions add focused responsibilities. Model and permission settings are inherited from the parent session.
+
+| Agent | Scope |
+|-------|-------|
+| `wiser-core` | Wiser API, domain mapping, polling, caching, hub lifecycle, and library tests |
+| `homey-devices` | Homey drivers, pairing/repair, capabilities and migrations, Flow cards, translations, and driver tests |
+| `quality-release` | Independent review, regression coverage, validation, CI, and documentation accuracy |
+
+When delegated work is requested, select only the roles relevant to the task. The primary agent coordinates changes across boundaries, assigns non-overlapping file ownership, integrates results, and runs the final checklist. Feature agents write their own tests; `quality-release` provides independent verification. Small changes can stay with the primary agent.
+
+Example requests:
+
+- "Have wiser-core investigate hub replacement and child reconnection, then have quality-release review the findings."
+- "Use homey-devices to implement the iTRV driver, with wiser-core verifying API mappings and quality-release reviewing the result."
+- "Have quality-release check this branch for regressions and publish-level validation failures."
+
+The planned `schedule-ui` specialist is deferred until schedule editing becomes an active task. The primary agent handles widget work in the meantime.
