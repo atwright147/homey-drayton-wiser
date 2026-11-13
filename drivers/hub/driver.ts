@@ -10,7 +10,7 @@ interface DiscoveredHub {
 interface HubDevice {
   name: string;
   data: { id: string };
-  store: { address: string; secret: string };
+  store: { address: string; secret: string; discoveryId?: string };
   settings: { pollInterval: number; useHttps: boolean };
 }
 
@@ -23,6 +23,8 @@ class HubDriver extends Homey.Driver {
     this.log('onPair v4 session started');
     let address = '';
     let secret = '';
+    let discoveryId: string | null = null;
+    let chipId: string | null = null;
 
     session.setHandler('discover', async (): Promise<DiscoveredHub[]> => {
       this.log('discover handler called');
@@ -36,7 +38,7 @@ class HubDriver extends Homey.Driver {
       }));
     });
 
-    session.setHandler('login', async (data: { ip: string; secret: string }): Promise<boolean> => {
+    session.setHandler('login', async (data: { ip: string; secret: string; discoveryId?: string | null }): Promise<boolean> => {
       this.log('Login handler called with ip:', data.ip);
       address = data.ip.trim();
       secret = data.secret.trim();
@@ -44,6 +46,17 @@ class HubDriver extends Homey.Driver {
       if (!address || !secret) {
         this.log('Missing address or secret');
         return false;
+      }
+
+      discoveryId = null;
+      chipId = null;
+      if (data.discoveryId) {
+        const results = this.getDiscoveryStrategy().getDiscoveryResults();
+        const selected = Object.values(results).find((result) => result.id === data.discoveryId);
+        if (!selected || selected.address !== address) {
+          throw new Error('The selected hub has moved. Select it again or enter its current IP address manually.');
+        }
+        discoveryId = selected.id;
       }
 
       const client = new WiserClient({
@@ -58,6 +71,7 @@ class HubDriver extends Homey.Driver {
           this.log('Verify failed: could not fetch domain or unexpected BrandName');
           throw new Error('Could not connect to the Wiser hub. Check the IP address and secret.');
         }
+        chipId = domain.System?.ChipId != null ? String(domain.System.ChipId) : null;
         this.log('Verify success');
         return true;
       } finally {
@@ -73,12 +87,25 @@ class HubDriver extends Homey.Driver {
       });
       try {
         const domain = await client.getDomain();
-        const id = domain.System?.ChipId ?? address;
+        if (domain.System?.BrandName !== 'WiserHeat') throw new Error('The selected address is not a Wiser HeatHub.');
+        const id = domain.System?.ChipId != null ? String(domain.System.ChipId) : address;
+        if (chipId !== null && id !== chipId) throw new Error('The selected hub changed during pairing. Try again.');
+        if (discoveryId) {
+          const selected = Object.values(this.getDiscoveryStrategy().getDiscoveryResults())
+            .find((result) => result.id === discoveryId);
+          if (!selected || selected.address !== address) {
+            throw new Error('The selected hub moved during pairing. Select it again.');
+          }
+        }
         return [
           {
             name: `Wiser HeatHub (${address})`,
             data: { id: String(id) },
-            store: { address, secret },
+            store: {
+              address,
+              secret,
+              ...(discoveryId && chipId ? { discoveryId } : {}),
+            },
             settings: { pollInterval: 30, useHttps: false },
           },
         ];

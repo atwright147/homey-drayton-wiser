@@ -87,4 +87,83 @@ describe('temporary pairing client cleanup', () => {
     await expect(driver.onPairListDevices()).resolves.toHaveLength(0);
     expect(dispose).toHaveBeenCalledTimes(2);
   });
+
+  it('stores the selected discovery identity while keeping ChipId as data.id', async () => {
+    vi.spyOn(WiserClient.prototype, 'dispose').mockResolvedValue(undefined);
+    vi.spyOn(WiserClient.prototype, 'verifyConnectionWithDomain').mockResolvedValue(domain);
+    vi.spyOn(WiserClient.prototype, 'getDomain').mockResolvedValue(domain);
+    const driver = new HubDriver();
+    driver.log = vi.fn();
+    driver.getDiscoveryStrategy = () => ({
+      getDiscoveryResults: () => ({ service: { id: 'service-1', address: '192.0.2.1' } }),
+    });
+    const { handlers, session } = makeHubPairSession();
+    await driver.onPair(session);
+    const login = handlers.get('login') as (data: { ip: string; secret: string; discoveryId: string }) => Promise<boolean>;
+    const listDevices = handlers.get('list_devices') as () => Promise<Array<{
+      data: { id: string };
+      store: { discoveryId?: string };
+    }>>;
+
+    await expect(login({ ip: '192.0.2.1', secret: 'test-secret', discoveryId: 'service-1' }))
+      .resolves.toBe(true);
+    const paired = await listDevices();
+    expect(paired[0].data.id).toBe('chip-1');
+    expect(paired[0].store.discoveryId).toBe('service-1');
+  });
+
+  it('rejects a selected service whose discovered address changed before login', async () => {
+    const verify = vi.spyOn(WiserClient.prototype, 'verifyConnectionWithDomain').mockResolvedValue(domain);
+    const driver = new HubDriver();
+    driver.log = vi.fn();
+    driver.getDiscoveryStrategy = () => ({
+      getDiscoveryResults: () => ({ service: { id: 'service-1', address: '192.0.2.2' } }),
+    });
+    const { handlers, session } = makeHubPairSession();
+    await driver.onPair(session);
+    const login = handlers.get('login') as (data: { ip: string; secret: string; discoveryId: string }) => Promise<boolean>;
+
+    await expect(login({ ip: '192.0.2.1', secret: 'test-secret', discoveryId: 'service-1' }))
+      .rejects.toThrow('selected hub has moved');
+    expect(verify).not.toHaveBeenCalled();
+  });
+
+  it('rejects a selected service whose address changes between login and device listing', async () => {
+    vi.spyOn(WiserClient.prototype, 'dispose').mockResolvedValue(undefined);
+    vi.spyOn(WiserClient.prototype, 'verifyConnectionWithDomain').mockResolvedValue(domain);
+    vi.spyOn(WiserClient.prototype, 'getDomain').mockResolvedValue(domain);
+    const selected = { id: 'service-1', address: '192.0.2.1' };
+    const driver = new HubDriver();
+    driver.log = vi.fn();
+    driver.getDiscoveryStrategy = () => ({ getDiscoveryResults: () => ({ service: selected }) });
+    const { handlers, session } = makeHubPairSession();
+    await driver.onPair(session);
+    const login = handlers.get('login') as (data: { ip: string; secret: string; discoveryId: string }) => Promise<boolean>;
+    const listDevices = handlers.get('list_devices') as () => Promise<unknown[]>;
+
+    await login({ ip: '192.0.2.1', secret: 'test-secret', discoveryId: 'service-1' });
+    selected.address = '192.0.2.2';
+    await expect(listDevices()).rejects.toThrow('moved during pairing');
+  });
+
+  it('keeps manual IP pairing independent of discovery identity', async () => {
+    vi.spyOn(WiserClient.prototype, 'dispose').mockResolvedValue(undefined);
+    vi.spyOn(WiserClient.prototype, 'verifyConnectionWithDomain').mockResolvedValue(domain);
+    vi.spyOn(WiserClient.prototype, 'getDomain').mockResolvedValue(domain);
+    const driver = new HubDriver();
+    driver.log = vi.fn();
+    driver.getDiscoveryStrategy = () => ({
+      getDiscoveryResults: () => ({ service: { id: 'service-1', address: '192.0.2.1' } }),
+    });
+    const { handlers, session } = makeHubPairSession();
+    await driver.onPair(session);
+    const login = handlers.get('login') as (data: { ip: string; secret: string }) => Promise<boolean>;
+    const listDevices = handlers.get('list_devices') as () => Promise<Array<{
+      store: { discoveryId?: string };
+    }>>;
+
+    await expect(login({ ip: '192.0.2.1', secret: 'test-secret' })).resolves.toBe(true);
+    const paired = await listDevices();
+    expect(paired[0].store.discoveryId).toBeUndefined();
+  });
 });

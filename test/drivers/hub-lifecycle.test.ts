@@ -1,4 +1,5 @@
 /* eslint-disable max-classes-per-file */
+import { EventEmitter } from 'node:events';
 import {
   afterEach, beforeEach, describe, expect, it, vi,
 } from 'vitest';
@@ -49,6 +50,9 @@ function makeDevice(Cls: new () => TestDevice, manager: WiserHubManager): TestDe
   };
   const settings = { pollInterval: 30, useHttps: false };
   device.homey = { app: { hubManager: manager } };
+  device.driver = {
+    getDiscoveryStrategy: () => Object.assign(new EventEmitter(), { getDiscoveryResults: () => ({}) }),
+  };
   device.getData = () => ({ id: 'hub-1' });
   device.getName = () => 'Test device';
   device.getStoreValue = (key: string) => store[key];

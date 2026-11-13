@@ -35,6 +35,7 @@
       const ipInput = document.getElementById('ip');
       const secretInput = document.getElementById('secret');
       const statusText = document.getElementById('status');
+      let selectedDiscoveryId = null;
 
       function loadDiscoveredHubs() {
         Homey.emit('discover').then(function(hubs) {
@@ -61,8 +62,15 @@
 
       hubSelect.addEventListener('change', function() {
         const address = hubSelect.value;
+        selectedDiscoveryId = hubSelect.selectedOptions[0] && hubSelect.selectedOptions[0].dataset.id || null;
         if (address) {
           ipInput.value = address;
+        }
+      });
+
+      ipInput.addEventListener('input', function() {
+        if (ipInput.value.trim() !== hubSelect.value) {
+          selectedDiscoveryId = null;
         }
       });
 
@@ -79,7 +87,7 @@
         connectButton.disabled = true;
         statusText.textContent = '';
 
-        Homey.emit('login', { ip: ip, secret: secret }).then(function(result) {
+        Homey.emit('login', { ip: ip, secret: secret, discoveryId: selectedDiscoveryId }).then(function(result) {
           connectButton.classList.remove('is-loading');
           connectButton.disabled = false;
           if (result) {
