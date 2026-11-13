@@ -16,22 +16,24 @@ Build a Homey Pro app that integrates with the Drayton Wiser HeatHub local API a
 
 - TypeScript strict mode
 - No comments in source code
-- Use `module.exports = class` for Homey-loaded files: `app.ts`, `driver.ts`, `device.ts`
+- Export the class directly with `module.exports` in Homey-loaded files: `app.ts`, `driver.ts`, `device.ts`. Named classes followed by `module.exports = ClassName` are supported.
 - SDK-free code lives in `lib/` and is unit-tested with Vitest
 - Use `undici` for HTTP
 
 ## Commands
 
-Run these from `/Users/andy/Developer/Homey/homey-drayton-wiser`:
+Run these from the repository root:
 
 ```bash
 npm test          # Vitest
 npm run lint      # ESLint
 npx tsc --noEmit  # Type check
-homey app validate
+homey app validate --level publish
 homey app build
 homey app run --remote   # REQUIRED for pairing tests
 ```
+
+Use the [Homey CLI skill](.agents/skills/homey-cli/SKILL.md) for installation, target selection, remote testing, and post-install verification.
 
 ## Pairing and Testing
 
@@ -63,11 +65,17 @@ homey app run --remote   # REQUIRED for pairing tests
 
 ## Drivers
 
-- `drivers/hub/` — HeatHub (complete, app-store-ready)
-- `drivers/room/` — Room thermostat (complete: temperature, setpoint, humidity from RoomStat, mode)
-- `drivers/hotwater/` — Hot water (complete: state, mode, next event, 30/60-minute boost buttons, schedule widget)
+- `drivers/hub/` — HeatHub: pairing, discovery recovery, Home/Away picker, read-only Away target temperature, comfort/eco modes, and diagnostics
+- `drivers/room/` — Room thermostat: temperature, setpoint, humidity from RoomStat, and mode
+- `drivers/hotwater/` — Hot water: state, mode, next event, 30/60-minute boost buttons, and schedule widget
 - Planned: iTRV, RoomStat
-- Drivers are SDK v3; follow the `drivers/hub/` pattern.
+- Drivers use SDK v3. The HeatHub owns the shared client and polling loop. Child drivers, including iTRV and RoomStat, should follow the Room/Hot Water pattern: subscribe to domain and health updates through `WiserHubManager`, resolve the current parent hub for writes, and unsubscribe on teardown.
+
+## Manifests and Capability Changes
+
+- Edit `.homeycompose/` and driver/widget compose files as the source of truth. Regenerate the tracked `app.json` with Homey tooling.
+- Add new capabilities to the driver manifest for new pairings and migrate existing paired devices in `onInit`; manifest edits alone do not upgrade those devices.
+- Preserve capability IDs used by existing Flows where possible. Keep deprecated capability definitions while migration code needs them for removal, and keep best-effort cleanup failures from aborting initialization.
 
 ## Important Gotchas
 
@@ -94,13 +102,13 @@ See `docs/` for detailed documentation:
 - `docs/widget.md`
 - `docs/next-steps.md`
 
-## Common Checklist Before Saying Done
+## Verification
 
-- `npm run lint` passes
-- `npm test` passes
-- `homey app validate` passes at `publish` level
-- `.homeybuild` is clean if pairing was tested
-- No secrets in logs or committed files
+- For code or manifest changes and release preparation, run `npm run lint`, `npm test`, `npx tsc --noEmit`, and `homey app validate --level publish`. Run `homey app build` when packaging or runtime behavior changes.
+- For documentation-only changes, check the diff, referenced paths, and accuracy against the current implementation; app tests and builds are unnecessary unless executable behavior also changes.
+- For pairing tests, ensure `.homeybuild` reflects the current source. If stale, delete that ignored build directory and rebuild before retesting; it does not need to be empty afterward.
+- Record checks performed, failures, and outstanding hardware checks. Publish validation and mocked tests do not establish live pairing, control behavior, or App Store readiness.
+- Keep secrets out of logs and committed files.
 
 ## Project Agents
 
