@@ -1,0 +1,9 @@
+/docs/
+/test/
+/test-hub.http
+/AGENTS.md
+/CONTRIBUTING.md
+/CODE_OF_CONDUCT.md
+/tsconfig.lint.json
+/package-lock.json
+/coverage/
