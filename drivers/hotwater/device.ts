@@ -74,6 +74,17 @@ class HotWaterDevice extends Homey.Device {
     return this.getStoreValue('hubId') as string;
   }
 
+  private async getTimeZone(): Promise<string | null> {
+    try {
+      const timeZone = await this.homey.clock.getTimezone();
+      if (!timeZone) throw new Error('Homey timezone is empty');
+      return timeZone;
+    } catch (err) {
+      this.error('Could not read Homey timezone:', err);
+      return null;
+    }
+  }
+
   private async setupHotWater(): Promise<void> {
     const hubId = this.getHubId();
     const hotWaterId = this.getHotWaterId();
@@ -166,7 +177,10 @@ class HotWaterDevice extends Homey.Device {
     const mode = hotWaterModeFromWiser(hotWater.Mode ?? '') ?? 'auto';
     const state = hotWaterState(hotWater);
     const schedule = this.findHotWaterSchedule(domain, hotWater.ScheduleId);
-    const nextEvent = formatNextHotWaterEvent(schedule);
+    const timeZone = schedule ? await this.getTimeZone() : null;
+    if (!this.hasCurrentDomain(domain, sourceHub)) return;
+    const nextEvent = schedule && timeZone ? formatNextHotWaterEvent(schedule, new Date(), timeZone) : null;
+    const nextEventText = schedule && !timeZone ? 'Timezone unavailable' : nextEvent ?? 'No schedule';
 
     this.log('HotWater poll: scheduleId', hotWater.ScheduleId, 'schedule found', !!schedule, 'nextEvent', nextEvent);
     if (!schedule) {
@@ -176,7 +190,7 @@ class HotWaterDevice extends Homey.Device {
     await this.setCapabilityValue('wiser_hotwater_state', state).catch(this.error);
     await this.setCapabilityValue('wiser_hotwater_mode', mode).catch(this.error);
     await this.setSettings({ hotWaterMode: mode }).catch(this.error);
-    await this.setCapabilityValue('wiser_hotwater_next_event', nextEvent ?? 'No schedule').catch(this.error);
+    await this.setCapabilityValue('wiser_hotwater_next_event', nextEventText).catch(this.error);
     if (!this.hasCurrentDomain(domain, sourceHub)) return;
     await this.updateAvailability('available');
     if (!this.hasCurrentDomain(domain, sourceHub)) {

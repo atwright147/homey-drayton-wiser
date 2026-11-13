@@ -1,5 +1,7 @@
 'use strict';
 
+const { formatNextHotWaterEvent, formatScheduleTime } = require('../../lib/wiser-utils');
+
 const DAY_NAMES = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
 module.exports = {
@@ -23,7 +25,7 @@ module.exports = {
     if (!hub || !hub.getHealth().available) {
       return { available: false, state: null, nextEvent: null, schedule: null };
     }
-    const domain = hub?.getDomain();
+    const domain = hub.getDomain();
 
     if (!domain) {
       return { available: false, state: null, nextEvent: null, schedule: null };
@@ -33,7 +35,16 @@ module.exports = {
     const schedule = domain.Schedule?.find((s) => s.id === hotWater?.ScheduleId);
 
     const state = hotWaterState(hotWater);
-    const nextEvent = nextEventFromSchedule(schedule) ?? device.capabilitiesObj?.wiser_hotwater_next_event?.value ?? null;
+    let nextEvent = null;
+    if (schedule) {
+      try {
+        const timeZone = await homey.clock.getTimezone();
+        if (!timeZone) throw new Error('Homey timezone is empty');
+        nextEvent = formatNextHotWaterEvent(schedule, undefined, timeZone);
+      } catch {
+        nextEvent = 'Timezone unavailable';
+      }
+    }
 
     return {
       available: true,
@@ -53,37 +64,6 @@ function hotWaterState(hotWater) {
   return null;
 }
 
-function nextEventFromSchedule(schedule, now) {
-  if (!schedule) return null;
-
-  if (schedule.Next?.Time != null && schedule.Next.Day != null && schedule.Next.State != null) {
-    return `${relativeDayName(schedule.Next.Day, now)} ${formatScheduleTime(schedule.Next.Time)} (${schedule.Next.State})`;
-  }
-
-  const reference = now ?? new Date();
-  const currentDay = reference.getDay();
-  const currentMinutes = reference.getHours() * 60 + reference.getMinutes();
-
-  const orderedDays = [];
-  for (let i = 0; i < 7; i++) {
-    const dayIndex = (currentDay + i) % 7;
-    const nameIndex = dayIndex === 0 ? 6 : dayIndex - 1;
-    orderedDays.push(DAY_NAMES[nameIndex]);
-  }
-
-  for (let offset = 0; offset < 7; offset++) {
-    const dayName = orderedDays[offset];
-    const slots = scheduleDaySlots(schedule[dayName]);
-    for (const slot of slots) {
-      const slotMinutes = Math.floor(slot.time / 100) * 60 + (slot.time % 100);
-      if (offset === 0 && slotMinutes <= currentMinutes) continue;
-      return `${dayLabel(offset, dayName)} ${formatScheduleTime(slot.time)} (${slot.state})`;
-    }
-  }
-
-  return null;
-}
-
 function scheduleDaySlots(dayData) {
   if (!Array.isArray(dayData)) return [];
   const slots = [];
@@ -97,36 +77,14 @@ function scheduleDaySlots(dayData) {
   return slots;
 }
 
-function formatScheduleTime(timeValue) {
-  const hours = Math.floor(timeValue / 100);
-  const minutes = timeValue % 100;
-  return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
-}
-
-function relativeDayName(dayName, now) {
-  const reference = now ?? new Date();
-  const currentDay = reference.getDay();
-  const dayIndex = DAY_NAMES.indexOf(dayName);
-  if (dayIndex === -1) return dayName;
-
-  const currentIndex = currentDay === 0 ? 6 : currentDay - 1;
-  if (dayIndex === currentIndex) return 'Today';
-  if (dayIndex === (currentIndex + 1) % 7) return 'Tomorrow';
-  return dayName;
-}
-
-function dayLabel(offset, dayName) {
-  if (offset === 0) return 'Today';
-  if (offset === 1) return 'Tomorrow';
-  return dayName;
-}
-
 function buildScheduleView(schedule) {
   const result = [];
   for (const day of DAY_NAMES) {
     const slots = scheduleDaySlots(schedule[day]);
     if (slots.length > 0) {
-      result.push({ day, slots });
+      result.push({ day, slots: slots.map((slot) => ({
+        time: formatScheduleTime(slot.time), state: slot.state,
+      })) });
     }
   }
   return result;

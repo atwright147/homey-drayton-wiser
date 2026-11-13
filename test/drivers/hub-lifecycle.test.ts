@@ -413,4 +413,57 @@ describe('shared hub device lifecycle', () => {
       manager.unregister('hub-1', newHub);
     }
   });
+
+  it('uses the current Homey timezone for each hot water poll', async () => {
+    vi.setSystemTime(new Date('2026-07-06T06:45:00Z'));
+    const scheduledDomain: WiserDomain = {
+      ...domain,
+      HotWater: [{
+        id: 1, Mode: 'Auto', WaterHeatingState: 'Off', ScheduleId: 10,
+      }],
+      Schedule: [{ id: 10, Monday: [630, -730, 1800] }],
+    };
+    vi.spyOn(WiserClient.prototype, 'getDomain').mockResolvedValue(scheduledDomain);
+    const manager = new WiserHubManager();
+    const hub = new WiserHub({ client: new WiserClient({ host: '192.0.2.1', secret: 'test-secret' }) });
+    manager.register('hub-1', hub);
+    const hotWater = makeDevice(HotWaterDevice, manager);
+    const getTimezone = vi.fn().mockResolvedValueOnce('Europe/London').mockResolvedValue('UTC');
+    (hotWater.homey as Record<string, unknown>).clock = { getTimezone };
+
+    await hotWater.onInit();
+    expect(hotWater.capabilityValues).toHaveBeenCalledWith('wiser_hotwater_next_event', 'Today 18:00 (On)');
+    await hub.poll();
+    expect(hotWater.capabilityValues).toHaveBeenLastCalledWith('wiser_hotwater_next_event', 'Today 07:30 (Off)');
+    expect(getTimezone).toHaveBeenCalledTimes(2);
+    await hotWater.onUninit();
+    manager.unregister('hub-1', hub);
+  });
+
+  it('shows a timezone error and retries the Homey clock on a later poll', async () => {
+    vi.setSystemTime(new Date('2026-07-06T06:45:00Z'));
+    const scheduledDomain: WiserDomain = {
+      ...domain,
+      HotWater: [{
+        id: 1, Mode: 'Auto', WaterHeatingState: 'Off', ScheduleId: 10,
+      }],
+      Schedule: [{ id: 10, Monday: [630, -730, 1800] }],
+    };
+    vi.spyOn(WiserClient.prototype, 'getDomain').mockResolvedValue(scheduledDomain);
+    const manager = new WiserHubManager();
+    const hub = new WiserHub({ client: new WiserClient({ host: '192.0.2.1', secret: 'test-secret' }) });
+    manager.register('hub-1', hub);
+    const hotWater = makeDevice(HotWaterDevice, manager);
+    const getTimezone = vi.fn().mockRejectedValueOnce(new Error('clock offline')).mockResolvedValue('Europe/London');
+    (hotWater.homey as Record<string, unknown>).clock = { getTimezone };
+
+    await hotWater.onInit();
+    expect(hotWater.capabilityValues).toHaveBeenCalledWith('wiser_hotwater_next_event', 'Timezone unavailable');
+    expect(hotWater.error).toHaveBeenCalled();
+    await hub.poll();
+    expect(hotWater.capabilityValues).toHaveBeenCalledWith('wiser_hotwater_next_event', 'Today 18:00 (On)');
+    expect(getTimezone).toHaveBeenCalledTimes(2);
+    await hotWater.onUninit();
+    manager.unregister('hub-1', hub);
+  });
 });

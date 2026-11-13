@@ -214,7 +214,7 @@ describe('nextHotWaterEvent', () => {
       Type: 'HotWater',
       Next: { Day: 'Monday', Time: 630, State: 'On' },
     };
-    const now = new Date('2026-07-06T09:00:00'); // Monday 09:00
+    const now = new Date('2026-07-06T09:00:00Z');
     expect(nextHotWaterEvent(schedule, now)).toEqual({ day: 'Today', time: '06:30', state: 'On' });
   });
 
@@ -224,7 +224,7 @@ describe('nextHotWaterEvent', () => {
       Type: 'HotWater',
       Next: { Day: 'Tuesday', Time: 630, State: 'On' },
     };
-    const now = new Date('2026-07-06T09:00:00'); // Monday 09:00
+    const now = new Date('2026-07-06T09:00:00Z');
     expect(nextHotWaterEvent(schedule, now)).toEqual({ day: 'Tomorrow', time: '06:30', state: 'On' });
   });
 
@@ -235,7 +235,7 @@ describe('nextHotWaterEvent', () => {
       Monday: [630, -1030, 1630, -2230],
       Tuesday: [700, -2030],
     };
-    const now = new Date('2026-07-06T09:00:00'); // Monday 09:00
+    const now = new Date('2026-07-06T09:00:00Z');
     expect(nextHotWaterEvent(schedule, now)).toEqual({ day: 'Today', time: '10:30', state: 'Off' });
   });
 
@@ -246,13 +246,55 @@ describe('nextHotWaterEvent', () => {
       Monday: [630, -2230],
       Tuesday: [700, -2030],
     };
-    const now = new Date('2026-07-06T23:00:00'); // Monday 23:00
+    const now = new Date('2026-07-06T23:00:00Z');
     expect(nextHotWaterEvent(schedule, now)).toEqual({ day: 'Tomorrow', time: '07:00', state: 'On' });
   });
 
   it('returns null for an empty schedule', () => {
     const schedule: WiserSchedule = { id: 1000, Type: 'HotWater' };
     expect(nextHotWaterEvent(schedule)).toBeNull();
+  });
+
+  it('uses the requested timezone in winter and summer', () => {
+    const schedule: WiserSchedule = { id: 1000, Monday: [730, 1800] };
+    expect(nextHotWaterEvent(schedule, new Date('2026-01-05T07:45:00Z'), 'Europe/London'))
+      .toEqual({ day: 'Today', time: '18:00', state: 'On' });
+    expect(nextHotWaterEvent(schedule, new Date('2026-07-06T06:45:00Z'), 'Europe/London'))
+      .toEqual({ day: 'Today', time: '18:00', state: 'On' });
+    expect(nextHotWaterEvent(schedule, new Date('2026-07-06T06:45:00Z')))
+      .toEqual({ day: 'Today', time: '07:30', state: 'On' });
+  });
+
+  it('uses the local day across midnight and the Sunday-to-Monday boundary', () => {
+    const schedule: WiserSchedule = { id: 1000, Monday: [15, 700] };
+    expect(nextHotWaterEvent(schedule, new Date('2026-07-05T22:45:00Z'), 'Europe/London'))
+      .toEqual({ day: 'Tomorrow', time: '00:15', state: 'On' });
+    expect(nextHotWaterEvent(schedule, new Date('2026-07-05T23:05:00Z'), 'Europe/London'))
+      .toEqual({ day: 'Today', time: '00:15', state: 'On' });
+  });
+
+  it('uses local clock time on both daylight-saving transition days', () => {
+    const springSchedule: WiserSchedule = { id: 1000, Sunday: [130, 230, 300] };
+    expect(nextHotWaterEvent(springSchedule, new Date('2026-03-29T01:05:00Z'), 'Europe/London'))
+      .toEqual({ day: 'Today', time: '02:30', state: 'On' });
+
+    const autumnSchedule: WiserSchedule = { id: 1000, Sunday: [130, 230] };
+    expect(nextHotWaterEvent(autumnSchedule, new Date('2026-10-25T01:10:00Z'), 'Europe/London'))
+      .toEqual({ day: 'Today', time: '01:30', state: 'On' });
+  });
+
+  it('finds the next weekly slot after all slots today have passed', () => {
+    const schedule: WiserSchedule = { id: 1000, Monday: [630] };
+    expect(nextHotWaterEvent(schedule, new Date('2026-07-06T19:00:00Z'), 'Europe/London'))
+      .toEqual({ day: 'Monday', time: '06:30', state: 'On' });
+  });
+
+  it('labels an explicit Next field using the local day', () => {
+    const schedule: WiserSchedule = { id: 1000, Next: { Day: 'Monday', Time: 600, State: 'On' } };
+    expect(nextHotWaterEvent(schedule, new Date('2026-07-05T23:30:00Z'), 'Europe/London'))
+      .toEqual({ day: 'Today', time: '06:00', state: 'On' });
+    expect(nextHotWaterEvent(schedule, new Date('2026-07-05T22:30:00Z'), 'Europe/London'))
+      .toEqual({ day: 'Tomorrow', time: '06:00', state: 'On' });
   });
 });
 
@@ -263,8 +305,14 @@ describe('formatNextHotWaterEvent', () => {
       Type: 'HotWater',
       Next: { Day: 'Monday', Time: 630, State: 'On' },
     };
-    const now = new Date('2026-07-08T09:00:00'); // Wednesday
+    const now = new Date('2026-07-08T09:00:00Z');
     expect(formatNextHotWaterEvent(schedule, now)).toBe('Monday 06:30 (On)');
+  });
+
+  it('passes the requested timezone to the next-event calculation', () => {
+    const schedule: WiserSchedule = { id: 1000, Monday: [730, 1800] };
+    expect(formatNextHotWaterEvent(schedule, new Date('2026-07-06T06:45:00Z'), 'Europe/London'))
+      .toBe('Today 18:00 (On)');
   });
 
   it('returns null when no event exists', () => {

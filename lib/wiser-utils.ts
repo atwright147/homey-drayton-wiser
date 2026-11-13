@@ -179,46 +179,53 @@ function scheduleDayName(offset: number, dayName: string): string {
   return dayName;
 }
 
-function relativeDayName(dayName: string, now?: Date): string {
-  const reference = now ?? new Date();
-  const currentDayIndex = reference.getDay();
+function currentScheduleTime(now: Date, timeZone: string): { dayIndex: number; minutes: number } {
+  const formatter = new Intl.DateTimeFormat('en-GB', {
+    timeZone,
+    weekday: 'long',
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23',
+  });
+  const parts = formatter.formatToParts(now);
+  const dayName = parts.find((part) => part.type === 'weekday')?.value ?? '';
+  const hours = Number(parts.find((part) => part.type === 'hour')?.value ?? 0);
+  const minutes = Number(parts.find((part) => part.type === 'minute')?.value ?? 0);
+  return { dayIndex: DAY_NAMES.indexOf(dayName), minutes: hours * 60 + minutes };
+}
+
+function relativeDayName(dayName: string, currentDayIndex: number): string {
   const dayIndex = DAY_NAMES.indexOf(dayName);
   if (dayIndex === -1) return dayName;
 
-  const jsCurrentDayIndex = currentDayIndex === 0 ? 6 : currentDayIndex - 1;
-  if (dayIndex === jsCurrentDayIndex) return 'Today';
-  if (dayIndex === (jsCurrentDayIndex + 1) % 7) return 'Tomorrow';
+  if (dayIndex === currentDayIndex) return 'Today';
+  if (dayIndex === (currentDayIndex + 1) % 7) return 'Tomorrow';
   return dayName;
 }
 
-export function nextHotWaterEvent(schedule: WiserSchedule | undefined, now?: Date): HotWaterScheduleEvent | null {
+export function nextHotWaterEvent(
+  schedule: WiserSchedule | undefined,
+  now?: Date,
+  timeZone = 'UTC',
+): HotWaterScheduleEvent | null {
   if (!schedule) return null;
+  const reference = now ?? new Date();
+  const current = currentScheduleTime(reference, timeZone);
 
   if (schedule.Next?.Time != null && schedule.Next.Day != null && schedule.Next.State != null) {
     return {
-      day: relativeDayName(schedule.Next.Day, now),
+      day: relativeDayName(schedule.Next.Day, current.dayIndex),
       time: formatScheduleTime(schedule.Next.Time),
       state: schedule.Next.State as 'On' | 'Off',
     };
   }
 
-  const reference = now ?? new Date();
-  const currentDay = reference.getDay();
-  const currentMinutes = reference.getHours() * 60 + reference.getMinutes();
-
-  const orderedDays: string[] = [];
-  for (let i = 0; i < 7; i++) {
-    const dayIndex = (currentDay + i) % 7;
-    const nameIndex = dayIndex === 0 ? 6 : dayIndex - 1;
-    orderedDays.push(DAY_NAMES[nameIndex]);
-  }
-
-  for (let offset = 0; offset < 7; offset++) {
-    const dayName = orderedDays[offset];
+  for (let offset = 0; offset <= 7; offset++) {
+    const dayName = DAY_NAMES[(current.dayIndex + offset) % 7];
     const slots = scheduleDaySlots((schedule as unknown as Record<string, unknown>)[dayName]);
     for (const slot of slots) {
       const slotMinutes = Math.floor(slot.time / 100) * 60 + (slot.time % 100);
-      if (offset === 0 && slotMinutes <= currentMinutes) continue;
+      if (offset === 0 && slotMinutes <= current.minutes) continue;
       return {
         day: scheduleDayName(offset, dayName),
         time: formatScheduleTime(slot.time),
@@ -230,8 +237,8 @@ export function nextHotWaterEvent(schedule: WiserSchedule | undefined, now?: Dat
   return null;
 }
 
-export function formatNextHotWaterEvent(schedule: WiserSchedule | undefined, now?: Date): string | null {
-  const event = nextHotWaterEvent(schedule, now);
+export function formatNextHotWaterEvent(schedule: WiserSchedule | undefined, now?: Date, timeZone = 'UTC'): string | null {
+  const event = nextHotWaterEvent(schedule, now, timeZone);
   if (!event) return null;
   return `${event.day} ${event.time} (${event.state})`;
 }
