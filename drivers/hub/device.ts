@@ -57,10 +57,7 @@ class HubDevice extends Homey.Device {
     this.hub = new WiserHub({ client: this.client, intervalMs });
 
     const id = this.getData().id as string;
-    const manager = this.getManager();
-    if (manager) {
-      manager.register(id, this.hub);
-    }
+    this.getManager().register(id, this.hub);
 
     this.hub.register(`hub:${id}`, (domain) => this.onPoll(domain));
     this.hub.start();
@@ -128,7 +125,7 @@ class HubDevice extends Homey.Device {
   }
 
   async onUninit(): Promise<void> {
-    this.hub?.stop();
+    if (this.hub) this.getManager().unregister(this.getData().id as string, this.hub);
   }
 
   async onSettings({
@@ -150,23 +147,21 @@ class HubDevice extends Homey.Device {
       await this.hub?.poll();
     }
     if (changedKeys.includes('pollInterval') || changedKeys.includes('useHttps')) {
-      this.hub?.stop();
-      const id = this.getData().id as string;
-      const manager = this.getManager();
-      if (manager && manager.has(id)) {
-        manager.unregister(id);
+      if (!this.hub) throw new Error('Hub not ready');
+      if (changedKeys.includes('useHttps')) {
+        const address = this.getStoreValue('address') as string;
+        const secret = this.getStoreValue('secret') as string;
+        this.client = new WiserClient({ host: address, secret, useHttps: Boolean(newSettings.useHttps) });
+        this.hub.setClient(this.client);
       }
-      await this.setupHub();
+      if (changedKeys.includes('pollInterval')) {
+        this.hub.setInterval(Number(newSettings.pollInterval) * 1000);
+      }
     }
   }
 
   async onDeleted(): Promise<void> {
-    this.hub?.stop();
-    const id = this.getData().id as string;
-    const manager = this.getManager();
-    if (manager) {
-      manager.unregister(id);
-    }
+    if (this.hub) this.getManager().unregister(this.getData().id as string, this.hub);
   }
 }
 

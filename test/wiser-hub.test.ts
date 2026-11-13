@@ -2,6 +2,7 @@ import {
   describe, it, expect, vi, beforeEach, afterEach,
 } from 'vitest';
 import { WiserHub } from '../lib/wiser-hub';
+import type { WiserClient } from '../lib/wiser-client';
 import type { WiserDomain } from '../lib/wiser-types';
 import domainFixture from './fixtures/domain.json';
 
@@ -10,6 +11,10 @@ function makeFakeClient(getDomain?: () => Promise<WiserDomain>) {
     getDomain: getDomain ?? vi.fn(async () => domainFixture as WiserDomain),
     getSchedules: vi.fn(async () => []),
   };
+}
+
+function asClient(client: ReturnType<typeof makeFakeClient>): WiserClient {
+  return client as unknown as WiserClient;
 }
 
 describe('WiserHub register/unregister', () => {
@@ -118,6 +123,50 @@ describe('WiserHub polling', () => {
     await inFlight;
     await vi.advanceTimersByTimeAsync(0);
     expect(getDomain).toHaveBeenCalledTimes(2);
+  });
+
+  it('discards a poll that finishes after the hub stops', async () => {
+    let resolveDomain: (domain: WiserDomain) => void = () => {};
+    const domainPromise = new Promise<WiserDomain>((resolve) => {
+      resolveDomain = resolve;
+    });
+    const client = makeFakeClient(vi.fn(() => domainPromise));
+    const hub = new WiserHub({ client: asClient(client) });
+    const listener = vi.fn();
+    hub.register('room:1', listener);
+
+    const pending = hub.poll();
+    hub.stop();
+    resolveDomain(domainFixture as WiserDomain);
+
+    expect(await pending).toBeNull();
+    expect(hub.getDomain()).toBeNull();
+    expect(listener).not.toHaveBeenCalled();
+    expect(client.getDomain).toHaveBeenCalledTimes(1);
+  });
+
+  it('replaces the client without publishing the old response or losing listeners', async () => {
+    let resolveOld: (domain: WiserDomain) => void = () => {};
+    const oldDomainPromise = new Promise<WiserDomain>((resolve) => {
+      resolveOld = resolve;
+    });
+    const oldClient = makeFakeClient(() => oldDomainPromise);
+    const newDomain = { Room: [{ id: 9 }] } as WiserDomain;
+    const newClient = makeFakeClient(async () => newDomain);
+    const hub = new WiserHub({ client: asClient(oldClient) });
+    const listener = vi.fn();
+    hub.register('room:1', listener);
+
+    const oldPoll = hub.poll();
+    hub.setClient(asClient(newClient));
+    resolveOld(domainFixture as WiserDomain);
+
+    expect(await oldPoll).toBeNull();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(hub.getClient()).toBe(newClient);
+    expect(hub.getDomain()).toBe(newDomain);
+    expect(listener).toHaveBeenCalledTimes(1);
+    expect(listener).toHaveBeenCalledWith(newDomain);
   });
 });
 

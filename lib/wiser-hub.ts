@@ -9,7 +9,7 @@ export interface WiserHubOptions {
 }
 
 export class WiserHub {
-  private readonly client: WiserClient;
+  private client: WiserClient;
   private intervalMs: number;
   private timer: ReturnType<typeof setInterval> | null = null;
   private readonly listeners: Map<string, HubListener> = new Map();
@@ -17,6 +17,7 @@ export class WiserHub {
   private running = false;
   private polling = false;
   private pendingPoll = false;
+  private generation = 0;
 
   constructor(opts: WiserHubOptions) {
     this.client = opts.client;
@@ -42,11 +43,25 @@ export class WiserHub {
     return this.client;
   }
 
+  setClient(client: WiserClient): void {
+    if (this.client === client) return;
+    this.client = client;
+    this.latestDomain = null;
+    this.generation += 1;
+    if (this.polling) {
+      this.pendingPoll = true;
+    } else if (this.running) {
+      this.poll().catch(() => {});
+    }
+  }
+
   setInterval(ms: number): void {
     this.intervalMs = ms;
     if (this.running) {
-      this.stop();
-      this.start();
+      if (this.timer !== null) clearInterval(this.timer);
+      this.timer = setInterval(() => {
+        this.poll().catch(() => {});
+      }, this.intervalMs);
     }
   }
 
@@ -61,6 +76,8 @@ export class WiserHub {
 
   stop(): void {
     this.running = false;
+    this.generation += 1;
+    this.pendingPoll = false;
     if (this.timer !== null) {
       clearInterval(this.timer);
       this.timer = null;
@@ -77,16 +94,19 @@ export class WiserHub {
       return null;
     }
     this.polling = true;
+    const { generation, client } = this;
     try {
       const [domain, schedules] = await Promise.all([
-        this.client.getDomain(),
-        this.client.getSchedules().catch(() => []),
+        client.getDomain(),
+        client.getSchedules().catch(() => []),
       ]);
+      if (generation !== this.generation) return null;
       if (schedules.length > 0) {
         domain.Schedule = schedules;
       }
       this.latestDomain = domain;
       for (const listener of this.listeners.values()) {
+        if (generation !== this.generation) return null;
         await Promise.resolve(listener(domain));
       }
       return domain;

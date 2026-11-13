@@ -1,6 +1,4 @@
 import Homey from 'homey';
-import { WiserHub } from '../../lib/wiser-hub';
-import { WiserClient } from '../../lib/wiser-client';
 import WiserHubManager from '../../lib/wiser-hub-manager';
 import {
   roomModeFromWiser,
@@ -37,9 +35,6 @@ function roomHumidity(domain: WiserDomain, room: WiserRoom): number | null {
 }
 
 class RoomDevice extends Homey.Device {
-  private hub: WiserHub | null = null;
-  private ownsHub = false;
-
   async onInit(): Promise<void> {
     this.log('Wiser Room device init:', this.getName());
     await this.setCapabilityValue(ROOM_MODE_CAPABILITY, 'auto').catch(this.error);
@@ -61,43 +56,27 @@ class RoomDevice extends Homey.Device {
   private async setupRoom(): Promise<void> {
     const hubId = this.getHubId();
     const roomId = this.getRoomId();
-    const address = this.getStoreValue('address') as string;
-    const secret = this.getStoreValue('secret') as string;
-
     const manager = this.getManager();
-    this.hub = manager.get(hubId) ?? null;
-
-    if (!this.hub && address && secret) {
-      const useHttps = Boolean(this.getStoreValue('useHttps'));
-      const client = new WiserClient({ host: address, secret, useHttps });
-      this.hub = new WiserHub({ client });
-      manager.register(hubId, this.hub);
-      this.ownsHub = true;
-    }
-
-    if (!this.hub) {
+    manager.subscribe(hubId, `room:${roomId}`, (domain) => this.onPoll(domain));
+    const hub = manager.get(hubId);
+    if (!hub) {
       await this.setUnavailable('The parent Wiser HeatHub is not available.');
-      this.error('No hub found for room');
-      return;
+    } else {
+      await hub.poll();
     }
-
-    this.hub.register(`room:${roomId}`, (domain) => this.onPoll(domain));
-    await this.hub.poll();
 
     this.registerCapabilityListener('target_temperature', async (value: number) => {
-      if (!this.hub) {
-        throw new Error('Hub not available');
-      }
-      await this.hub.getClient().setRoomSetpoint(roomId, value);
-      await this.hub.poll();
+      const currentHub = this.getManager().get(hubId);
+      if (!currentHub) throw new Error('Hub not available');
+      await currentHub.getClient().setRoomSetpoint(roomId, value);
+      await currentHub.poll();
     });
 
     this.registerCapabilityListener(ROOM_MODE_CAPABILITY, async (value: string) => {
-      if (!this.hub) {
-        throw new Error('Hub not available');
-      }
-      await this.hub.getClient().setRoomMode(roomId, value as RoomMode);
-      await this.hub.poll();
+      const currentHub = this.getManager().get(hubId);
+      if (!currentHub) throw new Error('Hub not available');
+      await currentHub.getClient().setRoomMode(roomId, value as RoomMode);
+      await currentHub.poll();
     });
   }
 
@@ -130,14 +109,7 @@ class RoomDevice extends Homey.Device {
   }
 
   private async teardown(): Promise<void> {
-    const roomId = this.getRoomId();
-    const hubId = this.getHubId();
-    this.hub?.unregister(`room:${roomId}`);
-    if (this.ownsHub) {
-      this.hub?.stop();
-      this.getManager().unregister(hubId);
-    }
-    this.hub = null;
+    this.getManager().unsubscribe(this.getHubId(), `room:${this.getRoomId()}`);
   }
 
   async onUninit(): Promise<void> {
@@ -153,9 +125,10 @@ class RoomDevice extends Homey.Device {
     changedKeys: string[];
   }): Promise<void> {
     if (changedKeys.includes('roomMode')) {
-      if (!this.hub) throw new Error('Hub not available');
-      await this.hub.getClient().setRoomMode(this.getRoomId(), newSettings.roomMode as RoomMode);
-      await this.hub.poll();
+      const hub = this.getManager().get(this.getHubId());
+      if (!hub) throw new Error('Hub not available');
+      await hub.getClient().setRoomMode(this.getRoomId(), newSettings.roomMode as RoomMode);
+      await hub.poll();
     }
   }
 

@@ -25,18 +25,18 @@ const setAvailable = vi.fn().mockResolvedValue(undefined);
 const setUnavailable = vi.fn().mockResolvedValue(undefined);
 const poll = vi.fn().mockResolvedValue(undefined);
 const getClient = vi.fn();
-const register = vi.fn();
-const getHub = vi.fn(() => ({ getClient, poll, register }));
+const subscribe = vi.fn();
+const unsubscribe = vi.fn();
+const getHub = vi.fn<() => { getClient: typeof getClient; poll: typeof poll } | undefined>(() => ({ getClient, poll }));
 const log = vi.fn();
 const error = vi.fn();
 
 const mockHomey = {
-  app: { hubManager: { get: getHub } },
+  app: { hubManager: { get: getHub, subscribe, unsubscribe } },
 };
 
 type TestDevice = Record<string, unknown> & {
   onInit: () => Promise<void>;
-  hub: { getClient: typeof getClient; poll: typeof poll } | null;
 };
 
 function makeDevice(storeOverrides: Record<string, unknown> = {}): TestDevice {
@@ -83,7 +83,7 @@ function resetMocks(): void {
   setUnavailable.mockResolvedValue(undefined);
   poll.mockResolvedValue(undefined);
   hasCapability.mockReturnValue(true);
-  getHub.mockReturnValue({ getClient, poll, register });
+  getHub.mockReturnValue({ getClient, poll });
   getClient.mockReturnValue(undefined);
 }
 
@@ -162,7 +162,7 @@ describe('HotWater device boost controls', () => {
   it('throws when the hub becomes unavailable after setup', async () => {
     const device = makeDevice();
     await device.onInit();
-    device.hub = null;
+    getHub.mockReturnValue(undefined);
 
     await expect(capabilityListener('wiser_hotwater_boost_30')()).rejects.toThrow('Hub not available');
     await expect(capabilityListener('wiser_hotwater_boost_60')()).rejects.toThrow('Hub not available');
