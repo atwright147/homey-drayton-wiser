@@ -15,6 +15,11 @@ export interface RoomScheduleDay {
   slots: RoomScheduleSlot[];
 }
 
+export interface ActiveRoomScheduleSlot {
+  day: string;
+  index: number;
+}
+
 function timeMinutes(value: unknown): number | null {
   if (typeof value !== 'number' || !Number.isInteger(value) || value < 0) return null;
   const hours = Math.floor(value / 100);
@@ -54,20 +59,40 @@ export function roomScheduleDays(schedule: WiserSchedule): RoomScheduleDay[] {
   return DAYS.map((day) => ({ day, slots: daySlots(source[day]) })).filter((day) => day.slots.length > 0);
 }
 
-export function nextRoomScheduleEvent(schedule: WiserSchedule, now: Date, timeZone: string): string | null {
+function localScheduleTime(now: Date, timeZone: string): { dayIndex: number; minutes: number } | null {
   const parts = new Intl.DateTimeFormat('en-GB', {
     timeZone, weekday: 'long', hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
   }).formatToParts(now);
   const dayName = parts.find((part) => part.type === 'weekday')?.value ?? '';
   const dayIndex = DAYS.indexOf(dayName);
   if (dayIndex < 0) return null;
-  const currentMinutes = Number(parts.find((part) => part.type === 'hour')?.value ?? 0) * 60
+  const minutes = Number(parts.find((part) => part.type === 'hour')?.value ?? 0) * 60
     + Number(parts.find((part) => part.type === 'minute')?.value ?? 0);
+  return { dayIndex, minutes };
+}
+
+export function activeRoomScheduleSlot(schedule: WiserSchedule, now: Date, timeZone: string): ActiveRoomScheduleSlot | null {
+  const localTime = localScheduleTime(now, timeZone);
+  if (!localTime) return null;
+  const source = schedule as unknown as Record<string, unknown>;
+  for (let offset = 0; offset < 7; offset++) {
+    const day = DAYS[(localTime.dayIndex - offset + 7) % 7];
+    const slots = daySlots(source[day]);
+    for (let index = slots.length - 1; index >= 0; index--) {
+      if (offset > 0 || slots[index].minutes <= localTime.minutes) return { day, index };
+    }
+  }
+  return null;
+}
+
+export function nextRoomScheduleEvent(schedule: WiserSchedule, now: Date, timeZone: string): string | null {
+  const localTime = localScheduleTime(now, timeZone);
+  if (!localTime) return null;
   const source = schedule as unknown as Record<string, unknown>;
   for (let offset = 0; offset <= 7; offset++) {
-    const day = DAYS[(dayIndex + offset) % 7];
+    const day = DAYS[(localTime.dayIndex + offset) % 7];
     for (const point of daySlots(source[day])) {
-      if (offset === 0 && point.minutes <= currentMinutes) continue;
+      if (offset === 0 && point.minutes <= localTime.minutes) continue;
       let label = day;
       if (offset === 0) label = 'Today';
       else if (offset === 1) label = 'Tomorrow';

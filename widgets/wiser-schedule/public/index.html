@@ -44,6 +44,7 @@
     .summary {
       display: flex;
       align-items: baseline;
+      flex-wrap: wrap;
       gap: 8px;
       margin-bottom: 8px;
       flex-shrink: 0;
@@ -86,14 +87,15 @@
       font-size: 11px;
       padding: 2px 5px;
       border-radius: 4px;
-      background: var(--homey-overlay-color, rgba(0, 0, 0, 0.05));
-    }
-    .slot.on {
-      color: #009639;
-      font-weight: 500;
+      background: transparent;
     }
     .slot.off {
       opacity: 0.6;
+    }
+    .slot.active {
+      color: #009639;
+      font-weight: 600;
+      opacity: 1;
     }
     .empty {
       font-size: 12px;
@@ -122,16 +124,13 @@
         return deviceIds && deviceIds[0];
       }
 
-      function renderState(state) {
+      function renderState(state, target) {
         const el = document.getElementById('state');
+        const status = state === true ? 'Heating' : state === false ? 'Not heating' : 'Status unknown';
+        el.textContent = status + (target ? ' · Target: ' + target : '');
         if (state === true) {
-          el.textContent = 'Heating';
           el.className = 'state';
-        } else if (state === false) {
-          el.textContent = 'Off';
-          el.className = 'state off';
         } else {
-          el.textContent = 'Unknown';
           el.className = 'state off';
         }
       }
@@ -150,7 +149,7 @@
           document.getElementById('schedule').innerHTML = '';
           return;
         }
-        renderState(data.state);
+        renderState(data.state, data.target);
         renderNext(data.nextEvent);
 
         const scheduleEl = document.getElementById('schedule');
@@ -167,9 +166,10 @@
 
             const slotsDiv = document.createElement('div');
             slotsDiv.className = 'slots';
-            for (const slot of day.slots) {
+            for (const [index, slot] of day.slots.entries()) {
               const slotDiv = document.createElement('div');
-              slotDiv.className = 'slot ' + (slot.state === 'On' ? 'on' : 'off');
+              const active = data.activeSlot && data.activeSlot.day === day.day && data.activeSlot.index === index;
+              slotDiv.className = 'slot' + (slot.state === 'Off' ? ' off' : '') + (active ? ' active' : '');
               slotDiv.textContent = slot.time + ' ' + slot.state;
               slotsDiv.appendChild(slotDiv);
             }
@@ -198,7 +198,9 @@
           .then(render)
           .catch(function (err) {
             document.getElementById('state').textContent = 'Error';
+            document.getElementById('state').className = 'state off';
             document.getElementById('next').textContent = 'Could not load schedule';
+            document.getElementById('schedule').innerHTML = '';
             console.error(err);
           });
       }

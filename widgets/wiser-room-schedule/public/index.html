@@ -44,6 +44,7 @@
     .summary {
       display: flex;
       align-items: baseline;
+      flex-wrap: wrap;
       gap: 8px;
       margin-bottom: 8px;
       flex-shrink: 0;
@@ -84,16 +85,19 @@
     }
     .slot {
       font-size: 11px;
+      font-weight: 400;
       padding: 2px 5px;
       border-radius: 4px;
-      background: var(--homey-overlay-color, rgba(0, 0, 0, 0.05));
-    }
-    .slot.on {
-      color: #009639;
-      font-weight: 500;
-    }
-    .slot.off {
+      background: transparent;
       opacity: 0.6;
+    }
+    .slot.current-column {
+      opacity: 1;
+    }
+    .slot.active {
+      color: #009639;
+      font-weight: 600;
+      opacity: 1;
     }
     .empty {
       font-size: 12px;
@@ -122,13 +126,13 @@
         return deviceIds && deviceIds[0];
       }
 
-      function renderState(state) {
+      function renderState(state, target) {
         const el = document.getElementById('state');
-        if (typeof state === 'number') {
-          el.textContent = 'Scheduled: ' + state + ' °C';
+        const status = state === true ? 'Heating' : state === false ? 'Not heating' : 'Status unknown';
+        el.textContent = status + (typeof target === 'number' ? ' · Target: ' + target + ' °C' : '');
+        if (state === true) {
           el.className = 'state';
         } else {
-          el.textContent = 'Unknown';
           el.className = 'state off';
         }
       }
@@ -149,7 +153,7 @@
           return;
         }
         document.getElementById('room-name').textContent = data.name || 'Room Schedule';
-        renderState(data.target);
+        renderState(data.state, data.target);
         renderNext(data.nextEvent);
 
         const scheduleEl = document.getElementById('schedule');
@@ -166,9 +170,11 @@
 
             const slotsDiv = document.createElement('div');
             slotsDiv.className = 'slots';
-            for (const slot of day.slots) {
+            for (const [index, slot] of day.slots.entries()) {
               const slotDiv = document.createElement('div');
-              slotDiv.className = 'slot ' + (slot.temperature === null ? 'off' : 'on');
+              const currentColumn = data.activeSlot && data.activeSlot.index === index;
+              const active = data.activeSlot && data.activeSlot.day === day.day && data.activeSlot.index === index;
+              slotDiv.className = 'slot' + (currentColumn ? ' current-column' : '') + (active ? ' active' : '');
               slotDiv.textContent = slot.time + ' (' + slot.label + ')';
               slotsDiv.appendChild(slotDiv);
             }
@@ -198,6 +204,7 @@
           .then(render)
           .catch(function (err) {
             document.getElementById('state').textContent = 'Error';
+            document.getElementById('state').className = 'state off';
             document.getElementById('room-name').textContent = 'Room Schedule';
             document.getElementById('schedule').innerHTML = '';
             document.getElementById('next').textContent = 'Could not load schedule';

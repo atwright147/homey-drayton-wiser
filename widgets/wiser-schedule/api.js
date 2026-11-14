@@ -1,6 +1,6 @@
 'use strict';
 
-const { formatNextHotWaterEvent, formatScheduleTime } = require('../../lib/wiser-utils');
+const { formatNextHotWaterEvent, formatScheduleTime, activeHotWaterScheduleSlot } = require('../../lib/wiser-utils');
 
 const DAY_NAMES = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
@@ -23,12 +23,12 @@ module.exports = {
     const manager = homey.app.hubManager;
     const hub = manager.get(hubId);
     if (!hub || !hub.getHealth().available) {
-      return { available: false, state: null, nextEvent: null, schedule: null };
+      return { available: false, state: null, target: null, nextEvent: null, activeSlot: null, schedule: null };
     }
     const domain = hub.getDomain();
 
     if (!domain) {
-      return { available: false, state: null, nextEvent: null, schedule: null };
+      return { available: false, state: null, target: null, nextEvent: null, activeSlot: null, schedule: null };
     }
 
     const hotWater = domain.HotWater?.find((hw) => hw.id === hotWaterId);
@@ -36,20 +36,26 @@ module.exports = {
 
     const state = hotWaterState(hotWater);
     let nextEvent = null;
+    let activeSlot = null;
     if (schedule) {
       try {
         const timeZone = await homey.clock.getTimezone();
         if (!timeZone) throw new Error('Homey timezone is empty');
-        nextEvent = formatNextHotWaterEvent(schedule, undefined, timeZone);
+        const now = new Date();
+        nextEvent = formatNextHotWaterEvent(schedule, now, timeZone);
+        activeSlot = activeHotWaterScheduleSlot(schedule, now, timeZone);
       } catch {
         nextEvent = 'Timezone unavailable';
       }
     }
 
+    const scheduledState = hotWater?.ScheduledWaterHeatingState;
     return {
       available: true,
       state,
+      target: scheduledState === 'On' || scheduledState === 'Off' ? scheduledState : null,
       nextEvent,
+      activeSlot,
       schedule: schedule ? buildScheduleView(schedule) : null,
     };
   },

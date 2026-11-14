@@ -20,6 +20,7 @@ import {
   hotWaterModeToWiser,
   hotWaterModeFromWiser,
   nextHotWaterEvent,
+  activeHotWaterScheduleSlot,
   formatNextHotWaterEvent,
   formatScheduleTime,
 } from '../lib/wiser-utils';
@@ -295,6 +296,36 @@ describe('nextHotWaterEvent', () => {
       .toEqual({ day: 'Today', time: '06:00', state: 'On' });
     expect(nextHotWaterEvent(schedule, new Date('2026-07-05T22:30:00Z'), 'Europe/London'))
       .toEqual({ day: 'Tomorrow', time: '06:00', state: 'On' });
+  });
+});
+
+describe('activeHotWaterScheduleSlot', () => {
+  const schedule: WiserSchedule = {
+    id: 1000,
+    Monday: [630, -730, 1800],
+    Tuesday: [700, -2030],
+  };
+
+  it('finds the latest scheduled change in the Homey timezone', () => {
+    expect(activeHotWaterScheduleSlot(schedule, new Date('2026-07-06T06:45:00Z'), 'Europe/London'))
+      .toEqual({ day: 'Monday', index: 1 });
+    expect(activeHotWaterScheduleSlot(schedule, new Date('2026-07-06T17:00:00Z'), 'Europe/London'))
+      .toEqual({ day: 'Monday', index: 2 });
+  });
+
+  it('carries the active change through midnight and sparse days', () => {
+    expect(activeHotWaterScheduleSlot(schedule, new Date('2026-07-06T04:00:00Z'), 'Europe/London'))
+      .toEqual({ day: 'Tuesday', index: 1 });
+    expect(activeHotWaterScheduleSlot(schedule, new Date('2026-07-09T12:00:00Z'), 'Europe/London'))
+      .toEqual({ day: 'Tuesday', index: 1 });
+  });
+
+  it('selects only one entry when times are unsorted and none for an empty schedule', () => {
+    const unsorted: WiserSchedule = { id: 1001, Monday: [1800, 630, -730] };
+    expect(activeHotWaterScheduleSlot(unsorted, new Date('2026-07-06T08:00:00Z'), 'Europe/London'))
+      .toEqual({ day: 'Monday', index: 2 });
+    expect(activeHotWaterScheduleSlot({ id: 1002 }, new Date('2026-07-06T08:00:00Z'), 'Europe/London'))
+      .toBeNull();
   });
 });
 

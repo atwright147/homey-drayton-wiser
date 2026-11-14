@@ -1,9 +1,9 @@
 'use strict';
 
-const { roomScheduleDays, nextRoomScheduleEvent } = require('../../lib/wiser-room-schedule');
+const { roomScheduleDays, nextRoomScheduleEvent, activeRoomScheduleSlot } = require('../../lib/wiser-room-schedule');
 const { validTemperatureFromApi } = require('../../lib/wiser-utils');
 
-const unavailable = () => ({ available: false, name: null, target: null, nextEvent: null, schedule: null });
+const unavailable = () => ({ available: false, name: null, state: null, target: null, nextEvent: null, activeSlot: null, schedule: null });
 
 module.exports = {
   async getSchedule({ homey, params }) {
@@ -16,13 +16,23 @@ module.exports = {
     if (!domain) return unavailable();
     const room = domain.Room?.find((item) => item.id === device.getStoreValue('roomId'));
     if (!room) return unavailable();
+    let state = null;
+    if (room.ControlOutputState === 'On') state = true;
+    else if (room.ControlOutputState === 'Off') state = false;
+    else if (typeof room.PercentageDemand === 'number' && Number.isFinite(room.PercentageDemand)
+      && room.PercentageDemand >= 0 && room.PercentageDemand <= 100) {
+      state = room.PercentageDemand > 0;
+    }
     const schedule = domain.Schedule?.find((item) => item.id === room.ScheduleId && (item.Type == null || item.Type === 'Heating'));
     let nextEvent = null;
+    let activeSlot = null;
     if (schedule) {
       try {
         const timeZone = await homey.clock.getTimezone();
         if (!timeZone) throw new Error('Homey timezone is empty');
-        nextEvent = nextRoomScheduleEvent(schedule, new Date(), timeZone);
+        const now = new Date();
+        nextEvent = nextRoomScheduleEvent(schedule, now, timeZone);
+        activeSlot = activeRoomScheduleSlot(schedule, now, timeZone);
       } catch {
         nextEvent = 'Timezone unavailable';
       }
@@ -31,8 +41,10 @@ module.exports = {
     return {
       available: true,
       name: room.Name ?? device.getName(),
-      target: validTemperatureFromApi(room.ScheduledSetPoint),
+      state,
+      target: validTemperatureFromApi(room.CurrentSetPoint ?? room.ScheduledSetPoint),
       nextEvent,
+      activeSlot,
       schedule: schedule ? roomScheduleDays(schedule) : null,
     };
   },

@@ -10,13 +10,28 @@ const apiModule: { exports: {
   getSchedule?: (args: { homey: unknown; params: { deviceId: string } }) => Promise<{
     available: boolean;
     state: boolean | null;
+    target: string | null;
     nextEvent: string | null;
+    activeSlot: { day: string; index: number } | null;
     schedule: unknown;
   }>;
 } } = { exports: {} };
 const apiSource = readFileSync(join(process.cwd(), 'widgets/wiser-schedule/api.js'), 'utf8');
-runInNewContext(apiSource, { module: apiModule, require: () => scheduleUtils });
-const widgetApi = { getSchedule: apiModule.exports.getSchedule! };
+function loadGetSchedule(now?: string) {
+  const moduleInstance: typeof apiModule = { exports: {} };
+  const FixedDate = class extends Date {
+    constructor() {
+      super(now ?? 0);
+    }
+  };
+  runInNewContext(apiSource, {
+    module: moduleInstance,
+    require: () => scheduleUtils,
+    Date: now ? FixedDate : Date,
+  });
+  return moduleInstance.exports.getSchedule!;
+}
+const widgetApi = { getSchedule: loadGetSchedule() };
 
 function makeHomey(available: boolean, domain: Record<string, unknown> | null) {
   const device = {
@@ -46,14 +61,16 @@ describe('schedule widget API connection status', () => {
     const result = await widgetApi.getSchedule({ homey, params: { deviceId: 'homey-device-1' } });
 
     expect(result).toEqual({
-      available: false, state: null, nextEvent: null, schedule: null,
+      available: false, state: null, target: null, nextEvent: null, activeSlot: null, schedule: null,
     });
     expect(hub.getDomain).not.toHaveBeenCalled();
   });
 
   it('returns current heating state after the connection recovers', async () => {
     const { homey } = makeHomey(true, {
-      HotWater: [{ id: 1, WaterHeatingState: 'On', ScheduleId: 3 }],
+      HotWater: [{
+        id: 1, WaterHeatingState: 'On', ScheduledWaterHeatingState: 'Off', ScheduleId: 3,
+      }],
       Schedule: [{ id: 3, Monday: [630, -730] }],
     });
 
@@ -61,6 +78,7 @@ describe('schedule widget API connection status', () => {
 
     expect(result.available).toBe(true);
     expect(result.state).toBe(true);
+    expect(result.target).toBe('Off');
     expect(result.schedule).toEqual([{
       day: 'Monday',
       slots: [
@@ -70,21 +88,20 @@ describe('schedule widget API connection status', () => {
   });
 
   it('uses the Homey timezone to find the next local schedule event', async () => {
-    vi.useFakeTimers();
-    vi.setSystemTime(new Date('2026-07-06T06:45:00Z'));
-    try {
-      const { homey } = makeHomey(true, {
-        HotWater: [{ id: 1, WaterHeatingState: 'Off', ScheduleId: 3 }],
-        Schedule: [{ id: 3, Monday: [630, -730, 1800] }],
-      });
+    const { homey } = makeHomey(true, {
+      HotWater: [{
+        id: 1, WaterHeatingState: 'Off', ScheduledWaterHeatingState: 'On', ScheduleId: 3,
+      }],
+      Schedule: [{ id: 3, Monday: [630, -730, 1800] }],
+    });
 
-      const result = await widgetApi.getSchedule({ homey, params: { deviceId: 'homey-device-1' } });
+    const fixedGetSchedule = loadGetSchedule('2026-07-06T06:45:00Z');
+    const result = await fixedGetSchedule({ homey, params: { deviceId: 'homey-device-1' } });
 
-      expect(result.nextEvent).toBe('Today 18:00 (On)');
-      expect(homey.clock.getTimezone).toHaveBeenCalledOnce();
-    } finally {
-      vi.useRealTimers();
-    }
+    expect(result.nextEvent).toBe('Today 18:00 (On)');
+    expect(result.activeSlot).toEqual({ day: 'Monday', index: 1 });
+    expect(result.target).toBe('On');
+    expect(homey.clock.getTimezone).toHaveBeenCalledOnce();
   });
 
   it('keeps live state and schedule when timezone lookup fails', async () => {
@@ -99,6 +116,7 @@ describe('schedule widget API connection status', () => {
     expect(result.available).toBe(true);
     expect(result.state).toBe(true);
     expect(result.nextEvent).toBe('Timezone unavailable');
+    expect(result.activeSlot).toBeNull();
     expect(result.schedule).toBeTruthy();
   });
 

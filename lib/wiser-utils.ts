@@ -136,6 +136,11 @@ export interface HotWaterScheduleEvent {
   state: 'On' | 'Off';
 }
 
+export interface ActiveHotWaterScheduleSlot {
+  day: string;
+  index: number;
+}
+
 const DAY_NAMES = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
 function scheduleDaySlots(dayData: unknown): Array<{ time: number; state: 'On' | 'Off' }> {
@@ -201,6 +206,32 @@ function relativeDayName(dayName: string, currentDayIndex: number): string {
   if (dayIndex === currentDayIndex) return 'Today';
   if (dayIndex === (currentDayIndex + 1) % 7) return 'Tomorrow';
   return dayName;
+}
+
+export function activeHotWaterScheduleSlot(
+  schedule: WiserSchedule | undefined,
+  now: Date,
+  timeZone = 'UTC',
+): ActiveHotWaterScheduleSlot | null {
+  if (!schedule) return null;
+  const current = currentScheduleTime(now, timeZone);
+  if (current.dayIndex < 0) return null;
+  const source = schedule as unknown as Record<string, unknown>;
+  for (let offset = 0; offset < 7; offset++) {
+    const day = DAY_NAMES[(current.dayIndex - offset + 7) % 7];
+    const slots = scheduleDaySlots(source[day]);
+    let latestIndex = -1;
+    let latestMinutes = -1;
+    slots.forEach((slot, index) => {
+      const minutes = Math.floor(slot.time / 100) * 60 + (slot.time % 100);
+      if ((offset > 0 || minutes <= current.minutes) && minutes >= latestMinutes) {
+        latestIndex = index;
+        latestMinutes = minutes;
+      }
+    });
+    if (latestIndex >= 0) return { day, index: latestIndex };
+  }
+  return null;
 }
 
 export function nextHotWaterEvent(

@@ -4,7 +4,7 @@ import { runInNewContext } from 'node:vm';
 import {
   describe, expect, it, vi,
 } from 'vitest';
-import { roomScheduleDays, nextRoomScheduleEvent } from '../lib/wiser-room-schedule';
+import { roomScheduleDays, nextRoomScheduleEvent, activeRoomScheduleSlot } from '../lib/wiser-room-schedule';
 import * as scheduleUtils from '../lib/wiser-room-schedule';
 import * as wiserUtils from '../lib/wiser-utils';
 import type { WiserSchedule } from '../lib/wiser-types';
@@ -14,13 +14,21 @@ const schedule = {
   Monday: { Time: [630, 800, 1800], DegreesC: [210, 150, 200] },
   Tuesday: { SetPoints: [{ Time: 630, DegreesC: 215 }, { Time: 2230, DegreesC: -200 }] },
 } as WiserSchedule;
-const apiModule: { exports: { getSchedule?: (args: { homey: unknown; params: { deviceId: string } }) => Promise<Record<string, unknown>> } } = { exports: {} };
-runInNewContext(readFileSync(join(process.cwd(), 'widgets/wiser-room-schedule/api.js'), 'utf8'), {
-  module: apiModule,
-  require: (name: string) => (name.includes('wiser-room-schedule') ? scheduleUtils : wiserUtils),
-  Date,
-});
-const getSchedule = apiModule.exports.getSchedule!;
+function loadGetSchedule(now?: string) {
+  const apiModule: { exports: { getSchedule?: (args: { homey: unknown; params: { deviceId: string } }) => Promise<Record<string, unknown>> } } = { exports: {} };
+  const FixedDate = class extends Date {
+    constructor() {
+      super(now ?? 0);
+    }
+  };
+  runInNewContext(readFileSync(join(process.cwd(), 'widgets/wiser-room-schedule/api.js'), 'utf8'), {
+    module: apiModule,
+    require: (name: string) => (name.includes('wiser-room-schedule') ? scheduleUtils : wiserUtils),
+    Date: now ? FixedDate : Date,
+  });
+  return apiModule.exports.getSchedule!;
+}
+const getSchedule = loadGetSchedule();
 
 function makeHomey(domain: Record<string, unknown> | null, available = true) {
   const device = {
@@ -91,12 +99,28 @@ describe('room schedule parsing', () => {
     expect(nextRoomScheduleEvent(schedule, new Date('2026-07-07T22:00:00Z'), 'Europe/London'))
       .toBe('Monday 06:30 (21 °C)');
   });
+
+  it('selects the active slot across days, sparse schedules, and week rollover', () => {
+    expect(activeRoomScheduleSlot(schedule, new Date('2026-07-06T06:45:00Z'), 'Europe/London'))
+      .toEqual({ day: 'Monday', index: 0 });
+    expect(activeRoomScheduleSlot(schedule, new Date('2026-07-06T07:00:00Z'), 'Europe/London'))
+      .toEqual({ day: 'Monday', index: 1 });
+    expect(activeRoomScheduleSlot(schedule, new Date('2026-07-06T04:00:00Z'), 'Europe/London'))
+      .toEqual({ day: 'Tuesday', index: 1 });
+    expect(activeRoomScheduleSlot(schedule, new Date('2026-07-09T12:00:00Z'), 'Europe/London'))
+      .toEqual({ day: 'Tuesday', index: 1 });
+  });
+
+  it('returns no active slot when the schedule has no valid setpoints', () => {
+    expect(activeRoomScheduleSlot({ id: 4 } as WiserSchedule, new Date('2026-07-06T12:00:00Z'), 'Europe/London'))
+      .toBeNull();
+  });
 });
 
 describe('room schedule widget API', () => {
   const domain = {
     Room: [{
-      id: 9, Name: 'Office', ScheduleId: 3, ScheduledSetPoint: 200,
+      id: 9, Name: 'Office', ScheduleId: 3, ScheduledSetPoint: 200, CurrentSetPoint: 210, ControlOutputState: 'On',
     }],
     Schedule: [schedule],
   };
@@ -104,17 +128,38 @@ describe('room schedule widget API', () => {
   it('returns the selected room schedule and its next change without polling', async () => {
     const { homey, hub } = makeHomey(domain);
     const response = await getSchedule({ homey, params: { deviceId: 'homey-room-1' } });
-    expect(response).toMatchObject({ available: true, name: 'Office', target: 20 });
+    expect(response).toMatchObject({
+      available: true, name: 'Office', state: true, target: 21,
+    });
     expect(response.nextEvent).toContain('°C');
     expect((response.schedule as unknown[]).length).toBe(2);
     expect(hub.getDomain).toHaveBeenCalledTimes(2);
+  });
+
+  it('shows idle heating with the effective target even when the schedule differs', async () => {
+    const { homey } = makeHomey({
+      Room: [{
+        id: 9, ScheduleId: 3, ScheduledSetPoint: 200, CurrentSetPoint: 190, ControlOutputState: 'Off',
+      }],
+      Schedule: [schedule],
+    });
+    const response = await getSchedule({ homey, params: { deviceId: 'homey-room-1' } });
+    expect(response).toMatchObject({ state: false, target: 19 });
+  });
+
+  it('returns one active weekly slot in the Homey timezone', async () => {
+    const { homey } = makeHomey(domain);
+    const fixedGetSchedule = loadGetSchedule('2026-07-06T06:45:00Z');
+    const response = await fixedGetSchedule({ homey, params: { deviceId: 'homey-room-1' } });
+    expect(response.activeSlot).toEqual({ day: 'Monday', index: 0 });
+    expect(response.nextEvent).toBe('Today 08:00 (15 °C)');
   });
 
   it('hides cached data while the hub is unavailable or the room is missing', async () => {
     const unavailable = makeHomey(domain, false);
     expect(await getSchedule({ homey: unavailable.homey, params: { deviceId: 'homey-room-1' } }))
       .toEqual({
-        available: false, name: null, target: null, nextEvent: null, schedule: null,
+        available: false, name: null, state: null, target: null, nextEvent: null, activeSlot: null, schedule: null,
       });
     expect(unavailable.hub.getDomain).not.toHaveBeenCalled();
     const missing = makeHomey({ Room: [], Schedule: [schedule] });
@@ -126,6 +171,7 @@ describe('room schedule widget API', () => {
     homey.clock.getTimezone.mockRejectedValueOnce(new Error('clock offline'));
     const response = await getSchedule({ homey, params: { deviceId: 'homey-room-1' } });
     expect(response.nextEvent).toBe('Timezone unavailable');
+    expect(response.activeSlot).toBeNull();
     expect(response.schedule).toBeTruthy();
   });
 
