@@ -15,16 +15,15 @@ export interface RoomScheduleDay {
   slots: RoomScheduleSlot[];
 }
 
-function timeMinutes(value: unknown, unit: 'clock' | 'minutes'): number | null {
+function timeMinutes(value: unknown): number | null {
   if (typeof value !== 'number' || !Number.isInteger(value) || value < 0) return null;
-  if (unit === 'minutes') return value < 1440 ? value : null;
   const hours = Math.floor(value / 100);
   const minutes = value % 100;
   return hours < 24 && minutes < 60 ? hours * 60 + minutes : null;
 }
 
-function slot(time: unknown, degrees: unknown, unit: 'clock' | 'minutes'): RoomScheduleSlot | null {
-  const minutes = timeMinutes(time, unit);
+function slot(time: unknown, degrees: unknown): RoomScheduleSlot | null {
+  const minutes = timeMinutes(time);
   if (minutes === null || typeof degrees !== 'number' || !Number.isFinite(degrees)) return null;
   const temperature = validTemperatureFromApi(degrees);
   if (temperature === null && degrees !== -200) return null;
@@ -41,10 +40,10 @@ function daySlots(value: unknown): RoomScheduleSlot[] {
   if (Array.isArray(day.SetPoints)) {
     slots = day.SetPoints.map((item: unknown) => {
       const point = item as Record<string, unknown> | null;
-      return point ? slot(point.Time, point.DegreesC, 'clock') : null;
+      return point ? slot(point.Time, point.DegreesC) : null;
     }).filter((item): item is RoomScheduleSlot => item !== null);
   } else if (Array.isArray(day.Time) && Array.isArray(day.DegreesC)) {
-    slots = day.Time.map((time: unknown, index: number) => slot(time, (day.DegreesC as unknown[])[index], 'minutes'))
+    slots = day.Time.map((time: unknown, index: number) => slot(time, (day.DegreesC as unknown[])[index]))
       .filter((item): item is RoomScheduleSlot => item !== null);
   }
   return slots.sort((a, b) => a.minutes - b.minutes);

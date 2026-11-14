@@ -169,7 +169,7 @@
             for (const slot of day.slots) {
               const slotDiv = document.createElement('div');
               slotDiv.className = 'slot ' + (slot.temperature === null ? 'off' : 'on');
-              slotDiv.textContent = slot.time + ' ' + slot.label;
+              slotDiv.textContent = slot.time + ' (' + slot.label + ')';
               slotsDiv.appendChild(slotDiv);
             }
             dayDiv.appendChild(slotsDiv);

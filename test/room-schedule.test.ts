@@ -11,8 +11,7 @@ import type { WiserSchedule } from '../lib/wiser-types';
 
 const schedule = {
   id: 3,
-  Type: 'Heating',
-  Monday: { Time: [390, 480, 1080], DegreesC: [210, 150, 200] },
+  Monday: { Time: [630, 800, 1800], DegreesC: [210, 150, 200] },
   Tuesday: { SetPoints: [{ Time: 630, DegreesC: 215 }, { Time: 2230, DegreesC: -200 }] },
 } as WiserSchedule;
 const apiModule: { exports: { getSchedule?: (args: { homey: unknown; params: { deviceId: string } }) => Promise<Record<string, unknown>> } } = { exports: {} };
@@ -39,7 +38,7 @@ function makeHomey(domain: Record<string, unknown> | null, available = true) {
 }
 
 describe('room schedule parsing', () => {
-  it('renders minute-of-day arrays and older clock SetPoints, including Off', () => {
+  it('renders live HHMM arrays and older SetPoints, including Off', () => {
     expect(roomScheduleDays(schedule)).toEqual([
       {
         day: 'Monday',
@@ -70,7 +69,7 @@ describe('room schedule parsing', () => {
   });
 
   it('rejects malformed slots and sorts remaining changes', () => {
-    expect(roomScheduleDays({ id: 1, Monday: { Time: [1080, 1500, 390, 480], DegreesC: [200, 210, 2000, 150] } } as WiserSchedule))
+    expect(roomScheduleDays({ id: 1, Monday: { Time: [1800, 2500, 390, 800], DegreesC: [200, 210, 2000, 150] } } as WiserSchedule))
       .toEqual([{
         day: 'Monday',
         slots: [

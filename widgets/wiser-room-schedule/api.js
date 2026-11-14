@@ -16,7 +16,7 @@ module.exports = {
     if (!domain) return unavailable();
     const room = domain.Room?.find((item) => item.id === device.getStoreValue('roomId'));
     if (!room) return unavailable();
-    const schedule = domain.Schedule?.find((item) => item.id === room.ScheduleId && item.Type === 'Heating');
+    const schedule = domain.Schedule?.find((item) => item.id === room.ScheduleId && (item.Type == null || item.Type === 'Heating'));
     let nextEvent = null;
     if (schedule) {
       try {
